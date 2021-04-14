@@ -1,5 +1,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE MonadComprehensions #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {-# LANGUAGE RankNTypes #-}
 import Prelude hiding (id)
 data Node a = Node {
@@ -30,18 +32,32 @@ data IntervalLabel a = IntervalLabel {
 
 charGraph :: Graph Char
 charGraph = Graph [ Node 'A' ['B']
-                  , Node 'B' []
+                  , Node 'B' ['C']
+                  , Node 'C' []
                   ]
 -- record-dotprocessor 
 -- > findPreAndPost charGraph
 --    [(A, 1, 4), (B, 2, 3)]
 --
-findPreAndPost :: forall a. Graph a -> [(a, Int, Int)]
-findPreAndPost (Graph graph) = [] --[(id (head graph :: Node a), 0, 0)]
+findPreAndPost :: forall a. Graph a -> [(a, Int{- , Int -})]
+findPreAndPost (Graph []) = []
+findPreAndPost (Graph [Node b []]) = [(b, 1)]
+findPreAndPost (Graph (( Node c d): rest )) = []
+
+
+helpPrePost :: Graph a -> Int -> Int
+helpPrePost (Graph []) acc = acc
+helpPrePost (Graph [Node b []]) acc = 1+acc
+helpPrePost (Graph ((Node c d): rest)) acc = helpPrePost (Graph rest)  (1+acc)
+
+
+
+    
+    {- [(id (head graph :: Node a), 0{- , 0 -})] -}
 
 findHops :: Graph a -> [(a, [a])]
 findHops graph = undefined
 
 
 main = do
- print $ findPreAndPost charGraph
+ print $ helpPrePost charGraph 0
