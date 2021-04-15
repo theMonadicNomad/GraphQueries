@@ -109,26 +109,29 @@ updatePost nd = do
 processNodes :: Nd -> Nd -> MKAILabel()
 processNodes nd parent = do
     inp <- ask
-    insertNodeinState nd parent
-    let fun = Map.lookup nd inp
-    case fun of
-        Nothing       -> tell [("n" )]
-        Just []       -> tell [("e" )] >> updatePost nd 
-        Just [x]      -> processNodes x nd >> updatePost nd 
-        Just (y : rest) -> processNodes y nd >> mapM_ (\x -> processNodes x nd) rest
-    tell [[]]
+  --  lift $ print nd
+    x <- insertNodeinState nd parent
+    unless x $ do
+        let fun = Map.lookup nd inp
+        case fun of
+            Nothing       -> return ()
+            Just []       -> return () -- updatePost nd 
+        --Just [x]      -> processNodes x nd >> updatePost nd 
+            Just rest -> mapM_ (\x -> processNodes x nd) rest -- >> updatePost nd
+        updatePost nd
 
-insertNodeinState :: Nd -> Nd -> MKAILabel ()
+insertNodeinState :: Nd -> Nd -> MKAILabel Bool
 insertNodeinState nd parent = do
     cailabel <- gets ailabel
     ccounter <- gets counter
     parentnodes <- gets parentNodes
     chops <- gets hopnodes
+   -- tell [(show nd ++ " : "++ show cailabel ++ " \\\n")]
     let label = Map.lookup nd cailabel
     case label of 
         Nothing -> (modify $ \st -> st { ailabel = Map.insert nd (Labels ccounter ccounter Set.empty Set.empty) cailabel,
                                          parentNodes    = Map.insert nd parent parentnodes, 
-                                        counter = ccounter+1 } )
+                                        counter = ccounter+1 } ) >> pure False
         _       -> do
             let label = Map.lookup parent cailabel
             case label of 
@@ -140,6 +143,7 @@ insertNodeinState nd parent = do
                          Just gp -> updateDirects nd parent gp
                          Nothing -> error "error grandparent"
                 Nothing -> error "error "
+            pure True
 
 
 
