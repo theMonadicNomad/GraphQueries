@@ -96,6 +96,15 @@ process =  do
     let fun = Map.lookup (Nd 'c') inp
     tell [("helloe " ++  show fun )] -}
 
+updatePost :: Nd ->MKAILabel()
+updatePost nd = do 
+    cailabel <- gets ailabel
+    ccounter <- gets counter
+    let label = Map.lookup nd cailabel
+    case label of
+            Just (Labels pr ps hp dir) -> modify $ \st-> st {ailabel = Map.insert nd (Labels pr ccounter hp dir) cailabel,
+                                                            counter = ccounter+1 }
+            Nothing -> error "error"
 
 processNodes :: Nd -> Nd -> MKAILabel()
 processNodes nd parent = do
@@ -104,11 +113,10 @@ processNodes nd parent = do
     let fun = Map.lookup nd inp
     case fun of
         Nothing       -> tell [("n" )]
-        Just []       -> tell [("e" )]
-        Just [x]      -> processNodes x nd
+        Just []       -> tell [("e" )] >> updatePost nd 
+        Just [x]      -> processNodes x nd >> updatePost nd 
         Just (y : rest) -> processNodes y nd >> mapM_ (\x -> processNodes x nd) rest
     tell [[]]
-
 
 insertNodeinState :: Nd -> Nd -> MKAILabel ()
 insertNodeinState nd parent = do
@@ -129,15 +137,21 @@ insertNodeinState nd parent = do
                                               hopnodes = nd:chops   } )
                      let grandparent = Map.lookup parent parentnodes
                      case grandparent of
-                         Just gp -> do 
-                             let glabel = Map.lookup gp cailabel
-                             case glabel of 
-                                 Just (Labels ppr pps php pdir) -> modify $ \st -> st { ailabel = Map.insert gp (Labels ppr pps php (Set.insert nd pdir) ) cailabel}
-                                 Nothing -> error "error again "
+                         Just gp -> updateDirects nd parent gp
                          Nothing -> error "error grandparent"
-                      -- >> tell [ ( "Hope node inserted :" ++ show nd) ]
                 Nothing -> error "error "
- 
+
+
+
+updateDirects :: Nd -> Nd -> Nd -> MKAILabel()
+updateDirects nd parent gp = do
+    cailabel <- gets ailabel
+    let glabel = Map.lookup gp cailabel
+    case glabel of 
+        Just (Labels ppr pps php pdir) -> modify $ \st -> st { ailabel = Map.insert gp (Labels ppr pps php (Set.insert nd pdir) ) cailabel}
+        Nothing -> error "error again "
+
+
 lookUpNdinState :: Nd -> MKAILabel ()
 lookUpNdinState nd = do
     cailabel <- gets ailabel
