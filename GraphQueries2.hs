@@ -71,11 +71,7 @@ graph2 =
       (Nd 'j', [ Nd 'k' ] ),
       (Nd 'k', [] )
     ]
-
-
-{- process :: [(Nd,[Nd])] -> IO()
-process adjacencylist = 
- -}    
+   
 main = do
     let input = Map.fromList graph2
     let ((), w) = evalRWS (process) input initSt
@@ -88,13 +84,6 @@ process =  do
     tell [(show cailabel)]
     parentnodes <- gets parentNodes
     tell [(show parentnodes)]
-
-
-    
-    {- do
-    inp <- ask
-    let fun = Map.lookup (Nd 'c') inp
-    tell [("helloe " ++  show fun )] -}
 
 updatePost :: Nd ->MKAILabel()
 updatePost nd = do 
@@ -109,15 +98,13 @@ updatePost nd = do
 processNodes :: Nd -> Nd -> MKAILabel()
 processNodes nd parent = do
     inp <- ask
-  --  lift $ print nd
     x <- insertNodeinState nd parent
     unless x $ do
         let fun = Map.lookup nd inp
         case fun of
             Nothing       -> return ()
-            Just []       -> return () -- updatePost nd 
-        --Just [x]      -> processNodes x nd >> updatePost nd 
-            Just rest -> mapM_ (\x -> processNodes x nd) rest -- >> updatePost nd
+            Just []       -> return () 
+            Just rest -> mapM_ (\x -> processNodes x nd) rest 
         updatePost nd
 
 insertNodeinState :: Nd -> Nd -> MKAILabel Bool
@@ -152,15 +139,5 @@ updateDirects nd parent gp = do
     cailabel <- gets ailabel
     let glabel = Map.lookup gp cailabel
     case glabel of 
-        Just (Labels ppr pps php pdir) -> modify $ \st -> st { ailabel = Map.insert gp (Labels ppr pps php (Set.insert nd pdir) ) cailabel}
+        Just (Labels ppr pps php pdir) -> modify $ \st -> st { ailabel = Map.insert gp (Labels ppr pps php (Set.insert parent pdir) ) cailabel}
         Nothing -> error "error again "
-
-
-lookUpNdinState :: Nd -> MKAILabel ()
-lookUpNdinState nd = do
-    cailabel <- gets ailabel
-    let label = Map.lookup nd cailabel
-    case label of
-        Nothing -> tell [("Nothing" )]
-        _       -> tell [(show label)]   
-    --return (Just cailabel)
