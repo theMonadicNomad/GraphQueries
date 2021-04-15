@@ -127,17 +127,21 @@ insertNodeinState nd parent = do
                                               hopnodes = nd:chops   } )
                      let grandparent = Map.lookup parent parentnodes
                      case grandparent of
-                         Just gp -> updateDirects nd parent gp
+                         Just gp -> updateDirects parent gp
                          Nothing -> error "error grandparent"
                 Nothing -> error "error "
             pure True
 
 
 
-updateDirects :: Nd -> Nd -> Nd -> MKAILabel()
-updateDirects nd parent gp = do
+updateDirects :: Nd -> Nd -> MKAILabel()
+updateDirects parent gp = do
     cailabel <- gets ailabel
     let glabel = Map.lookup gp cailabel
     case glabel of 
         Just (Labels ppr pps php pdir) -> modify $ \st -> st { ailabel = Map.insert gp (Labels ppr pps php (Set.insert parent pdir) ) cailabel}
         Nothing -> error "error again "
+    parentnodes <- gets parentNodes
+    let Just ggp = Map.lookup gp parentnodes
+    if (ggp == gp) then return()
+    else updateDirects parent ggp
