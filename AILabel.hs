@@ -18,7 +18,6 @@ newtype Nd = Nd Char
 
 type Output = [String]
 type Input = Map Nd [Nd]
---type Hops = [Nd]
 type Hops = Set Nd
 type Directs = Set Nd
 type Pre = Int
