@@ -7,6 +7,9 @@ import Data.List (intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import Data.Set (Set)
+import qualified Data.Set as Set
+
 
 type MKAILabel = RWS Input Output St
 
@@ -15,8 +18,9 @@ newtype Nd = Nd Char
 
 type Output = [String]
 type Input = Map Nd [Nd]
-type Hops = [Nd]
-type Directs = [Nd]
+--type Hops = [Nd]
+type Hops = Set Nd
+type Directs = Set Nd
 type Pre = Int
 type Post = Int
 
@@ -29,7 +33,7 @@ data Labels = Labels {
 
 data St = St {
     ailabel      :: Map Nd Labels,
-    appil        :: Map Nd Nd,
+    parentNodes  :: Map Nd Nd,
     counter      :: Int,
     hopnodes     :: [Nd],
     specialnodes :: [Nd]{- ,
@@ -40,7 +44,7 @@ data St = St {
 initSt :: St
 initSt = St {
     ailabel     = Map.empty,
-    appil       = Map.empty,
+    parentNodes = Map.empty,
     counter     = 0,
     hopnodes        = [],
     specialnodes    = []{- ,
@@ -74,14 +78,23 @@ process adjacencylist =
  -}    
 main = do
     let input = Map.fromList graph2
-    let ((), w) = evalRWS (processNodes (Nd 'a') (Nd 'a') ) input initSt
+    let ((), w) = evalRWS (process) input initSt
     print w
 
 process :: MKAILabel ()
-process =  do 
+process =  do
+    (processNodes (Nd 'a') (Nd 'a') ) 
+    cailabel <- gets ailabel
+    tell [(show cailabel)]
+    parentnodes <- gets parentNodes
+    tell [(show parentnodes)]
+
+
+    
+    {- do
     inp <- ask
     let fun = Map.lookup (Nd 'c') inp
-    tell [("helloe " ++  show fun )]
+    tell [("helloe " ++  show fun )] -}
 
 
 processNodes :: Nd -> Nd -> MKAILabel()
@@ -90,8 +103,8 @@ processNodes nd parent = do
     insertNodeinState nd parent
     let fun = Map.lookup nd inp
     case fun of
-        Nothing       -> tell [("nothing here " )]
-        Just []       -> tell [("nothing lso " )]
+        Nothing       -> tell [("n" )]
+        Just []       -> tell [("e" )]
         Just [x]      -> processNodes x nd
         Just (y : rest) -> processNodes y nd >> mapM_ (\x -> processNodes x nd) rest
     tell [[]]
@@ -101,15 +114,30 @@ insertNodeinState :: Nd -> Nd -> MKAILabel ()
 insertNodeinState nd parent = do
     cailabel <- gets ailabel
     ccounter <- gets counter
+    parentnodes <- gets parentNodes
     chops <- gets hopnodes
     let label = Map.lookup nd cailabel
     case label of 
-        Nothing -> (modify $ \st -> st { ailabel = Map.insert nd (Labels ccounter ccounter [] []) cailabel,
-                                        counter = ccounter+1
-         } )-- >> tell [ ( "counter updated  :" ++ show (ccounter+1)) ]
-        _       -> (modify $ \st -> st { hopnodes = nd:chops   } )-- >> tell [ ( "Hope node inserted :" ++ show nd) ]
-    tell [(show cailabel)]
-
+        Nothing -> (modify $ \st -> st { ailabel = Map.insert nd (Labels ccounter ccounter Set.empty Set.empty) cailabel,
+                                         parentNodes    = Map.insert nd parent parentnodes, 
+                                        counter = ccounter+1 } )
+        _       -> do
+            let label = Map.lookup parent cailabel
+            case label of 
+                Just (Labels pr ps hp dir) -> do
+                     (modify $ \st -> st { ailabel = Map.insert parent (Labels pr ps (Set.insert nd hp) dir) cailabel,
+                                              hopnodes = nd:chops   } )
+                     let grandparent = Map.lookup parent parentnodes
+                     case grandparent of
+                         Just gp -> do 
+                             let glabel = Map.lookup gp cailabel
+                             case glabel of 
+                                 Just (Labels ppr pps php pdir) -> modify $ \st -> st { ailabel = Map.insert gp (Labels ppr pps php (Set.insert nd pdir) ) cailabel}
+                                 Nothing -> error "error again "
+                         Nothing -> error "error grandparent"
+                      -- >> tell [ ( "Hope node inserted :" ++ show nd) ]
+                Nothing -> error "error "
+ 
 lookUpNdinState :: Nd -> MKAILabel ()
 lookUpNdinState nd = do
     cailabel <- gets ailabel
