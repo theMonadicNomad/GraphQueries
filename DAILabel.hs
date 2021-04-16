@@ -86,7 +86,7 @@ process =  do
     tell [(show current_dailabel)]
     parentnodes <- gets parentNodes
     tell [(show parentnodes)]
-    flag <- query (Nd 'c') (Nd 'b')
+    flag <- search (Nd 'a') (Nd 'b')
     tell [(show flag)]
 
 updatePost :: Nd ->MKDAILabel()
@@ -172,11 +172,26 @@ search :: Nd -> Nd -> MKDAILabel Bool
 search nd1 nd2 = do
     current_dailabel <- gets dailabel
     let label1 = Map.lookup nd1 current_dailabel
+    case label1 of
+        Just (Labels trp1 pre1 post1 hp1 dir1) -> do
+            flag <- query nd1 nd2
+            if flag then return True
+            else do
+                x <- or <$> (mapM (\x -> query x nd2) (Set.toList hp1)) 
+                if not x 
+                     then or <$> (mapM (\x -> query x nd2) (Set.toList dir1)) 
+                else return x
+
+{- search :: Nd -> Nd -> MKDAILabel Bool
+search nd1 nd2 = do
+    current_dailabel <- gets dailabel
+    let label1 = Map.lookup nd1 current_dailabel
     case label1 of 
         Just (Labels trp1 pre1 post1 hp1 dir1) -> do
             flag <- query nd1 nd2
             if flag then return True
-            else if or (mapM_ (\x -> query x nd2) hp1) then return True
+            else if or <$> (mapM (\x -> query x nd2) hp1) then return True
+          --  else if or <$> (mapM (\x -> query x nd2) hp1) then return True
             else return False
- 
+ -} 
 
