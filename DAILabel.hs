@@ -168,7 +168,7 @@ query nd1 nd2 = do
 
 
 
-{- search :: Nd -> Nd -> MKDAILabel Bool
+search :: Nd -> Nd -> MKDAILabel Bool
 search nd1 nd2 = do
     current_dailabel <- gets dailabel
     let label1 = Map.lookup nd1 current_dailabel
@@ -178,5 +178,5 @@ search nd1 nd2 = do
             if flag then return True
             else if or (mapM_ (\x -> query x nd2) hp1) then return True
             else return False
- -}
+ 
 
