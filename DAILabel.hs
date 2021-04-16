@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State as CMS
@@ -147,5 +148,27 @@ updateDirects parent gp = do
     if (ggp == gp) then return()
     else updateDirects parent ggp
 
-search :: Graph -> Nd -> Nd -> MKDAILabel Bool
-search graph2 (Nd 'a') (Nd 'd') = undefined
+
+
+query :: Nd -> Nd -> MKDAILabel Bool
+query nd1 nd2 = do
+    current_dailabel <- gets dailabel
+    let label1 = Map.lookup nd1 current_dailabel
+    case label1 of 
+        Just (Labels trp1 pre1 post1 hp1 dir1) -> do
+            let label2 = Map.lookup nd2 current_dailabel
+            case label2 of
+                Just (Labels trp2 pre2 post2 hp2 dir2) -> do
+                    if  | (pre1 < post2 && post2 <= post1) -> return True
+                        | not $ null hp1 -> return True
+                        | not $ null dir1 -> return True
+                        | otherwise -> return False
+                Nothing -> error "error "
+
+                
+        Nothing -> error "error again "
+
+
+
+search :: Nd -> Nd -> MKDAILabel Bool
+search (Nd 'a') (Nd 'd') = undefined
