@@ -1,0 +1,189 @@
+[(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),
+(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),
+(Nd 'c',Labels {pre = 10, post = 10, hops = [Nd 'h'], directs = []}),
+(Nd 'd',Labels {pre = 2, post = 2, hops = [], directs = []}),
+(Nd 'e',Labels {pre = 4, post = 4, hops = [], directs = []}),
+(Nd 'f',Labels {pre = 9, post = 9, hops = [Nd 'g'], directs = []}),
+(Nd 'g',Labels {pre = 5, post = 5, hops = [Nd 'j',Nd 'i'], directs = []}),
+(Nd 'h',Labels {pre = 8, post = 8, hops = [Nd 'k',Nd 'k'], directs = []}),
+(Nd 'i',Labels {pre = 6, post = 6, hops = [Nd 'k',Nd 'k'], directs = []}),
+(Nd 'j',Labels {pre = 7, post = 7, hops = [Nd 'k',Nd 'k'], directs = []}),
+(Nd 'k',Labels {pre = 3, post = 3, hops = [], directs = []})]"]
+
+
+
+
+["nothing lso ","","","nothing lso ","","","nothing lso ","","","","nothing lso ","","","","nothing lso ","","","nothing lso ","","","","","","nothing lso ","","","","","[(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'c',Labels {pre = 10, post = 10, hops = [Nd 'h'], directs = []}),(Nd 'd',Labels {pre = 2, post = 2, hops = [], directs = []}),(Nd 'e',Labels {pre = 4, post = 4, hops = [], directs = []}),(Nd 'f',Labels {pre = 9, post = 9, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {pre = 5, post = 5, hops = [Nd 'i',Nd 'j'], directs = []}),(Nd 'h',Labels {pre = 8, post = 8, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 6, post = 6, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 7, post = 7, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 3, hops = [], directs = []})]","[(Nd 'a',Nd 'a'),(Nd 'b',Nd 'a'),(Nd 'c',Nd 'a'),(Nd 'd',Nd 'b'),(Nd 'e',Nd 'b'),(Nd 'f',Nd 'b'),(Nd 'g',Nd 'e'),(Nd 'h',Nd 'e'),(Nd 'i',Nd 'g'),(Nd 'j',Nd 'g'),(Nd 'k',Nd 'd')]"]
+
+
+
+
+[(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),
+(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),
+(Nd 'c',Labels {pre = 10, post = 10, hops = [Nd 'h'], directs = []}),
+(Nd 'd',Labels {pre = 2, post = 2, hops = [], directs = []}),
+(Nd 'e',Labels {pre = 4, post = 4, hops = [], directs = []}),
+(Nd 'f',Labels {pre = 9, post = 9, hops = [Nd 'g'], directs = []}),
+(Nd 'g',Labels {pre = 5, post = 5, hops = [Nd 'i',Nd 'j'], directs = []}),
+(Nd 'h',Labels {pre = 8, post = 8, hops = [Nd 'k'], directs = []}),
+(Nd 'i',Labels {pre = 6, post = 6, hops = [Nd 'k'], directs = []}),
+(Nd 'j',Labels {pre = 7, post = 7, hops = [Nd 'k'], directs = []}),
+(Nd 'k',Labels {pre = 3, post = 3, hops = [], directs = []})]",
+
+"[(Nd 'a',Nd 'a'),
+(Nd 'b',Nd 'a'),
+(Nd 'c',Nd 'a'),
+(Nd 'd',Nd 'b'),
+(Nd 'e',Nd 'b'),
+(Nd 'f',Nd 'b'),
+(Nd 'g',Nd 'e'),
+(Nd 'h',Nd 'e'),
+(Nd 'i',Nd 'g'),
+(Nd 'j',Nd 'g'),
+(Nd 'k',Nd 'd')]"]
+
+
+
+
+ [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = [Nd 'h']}),
+ (Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = [Nd 'g']}),
+ (Nd 'c',Labels {pre = 10, post = 10, hops = [], directs = []}),
+ (Nd 'd',Labels {pre = 2, post = 2, hops = [], directs = []}),
+ (Nd 'e',Labels {pre = 4, post = 4, hops = [], directs = [Nd 'i',Nd 'j',Nd 'k']}),
+ (Nd 'f',Labels {pre = 9, post = 9, hops = [], directs = []}),
+ (Nd 'g',Labels {pre = 5, post = 5, hops = [], directs = [Nd 'k']}),
+ (Nd 'h',Labels {pre = 8, post = 8, hops = [], directs = []}),
+ (Nd 'i',Labels {pre = 6, post = 6, hops = [], directs = []}),
+ (Nd 'j',Labels {pre = 7, post = 7, hops = [], directs = []}),
+ (Nd 'k',Labels {pre = 3, post = 3, hops = [], directs = []})]
+ 
+ ","[(Nd 'a',Nd 'a'),(Nd 'b',Nd 'a'),(Nd 'c',Nd 'a'),(Nd 'd',Nd 'b'),(Nd 'e',Nd 'b'),(Nd 'f',Nd 'b'),(Nd 'g',Nd 'e'),(Nd 'h',Nd 'e'),(Nd 'i',Nd 'g'),(Nd 'j',Nd 'g'),(Nd 'k',Nd 'd')]"]
+
+
+
+
+
+
+[(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = [Nd 'h']}),
+(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = [Nd 'g']})
+,(Nd 'c',Labels {pre = 10, post = 10, hops = [Nd 'h'], directs = []}),
+(Nd 'd',Labels {pre = 2, post = 2, hops = [], directs = []}),
+(Nd 'e',Labels {pre = 4, post = 4, hops = [], directs = [Nd 'i',Nd 'j',Nd 'k']}),
+(Nd 'f',Labels {pre = 9, post = 9, hops = [Nd 'g'], directs = []}),
+(Nd 'g',Labels {pre = 5, post = 5, hops = [Nd 'i',Nd 'j'], directs = [Nd 'k']}),
+(Nd 'h',Labels {pre = 8, post = 8, hops = [Nd 'k'], directs = []}),
+(Nd 'i',Labels {pre = 6, post = 6, hops = [Nd 'k'], directs = []}),
+(Nd 'j',Labels {pre = 7, post = 7, hops = [Nd 'k'], directs = []}),
+(Nd 'k',Labels {pre = 3, post = 3, hops = [], directs = []})]
+
+
+
+","[(Nd 'a',Nd 'a'),(Nd 'b',Nd 'a'),(Nd 'c',Nd 'a'),(Nd 'd',Nd 'b'),(Nd 'e',Nd 'b'),(Nd 'f',Nd 'b'),(Nd 'g',Nd 'e'),(Nd 'h',Nd 'e'),(Nd 'i',Nd 'g'),(Nd 'j',Nd 'g'),(Nd 'k',Nd 'd')]"]
+
+
+[(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = [Nd 'h']}),
+(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = [Nd 'g']}),
+(Nd 'c',Labels {pre = 17, post = 19, hops = [Nd 'h'], directs = []}),
+(Nd 'd',Labels {pre = 2, post = 4, hops = [], directs = []}),
+(Nd 'e',Labels {pre = 5, post = 5, hops = [], directs = [Nd 'i',Nd 'j',Nd 'k']}),
+(Nd 'f',Labels {pre = 13, post = 16, hops = [Nd 'g'], directs = []}),
+(Nd 'g',Labels {pre = 6, post = 6, hops = [Nd 'i',Nd 'j'], directs = [Nd 'k']}),
+(Nd 'h',Labels {pre = 11, post = 18, hops = [Nd 'k'], directs = []}),
+(Nd 'i',Labels {pre = 7, post = 14, hops = [Nd 'k'], directs = []}),
+(Nd 'j',Labels {pre = 9, post = 15, hops = [Nd 'k'], directs = []}),
+(Nd 'k',Labels {pre = 3, post = 3, hops = [], directs = []})]","[(Nd 'a',Nd 'a'),(Nd 'b',Nd 'a'),(Nd 'c',Nd 'a'),(Nd 'd',Nd 'b'),(Nd 'e',Nd 'b'),(Nd 'f',Nd 'b'),(Nd 'g',Nd 'e'),(Nd 'h',Nd 'e'),(Nd 'i',Nd 'g'),(Nd 'j',Nd 'g'),(Nd 'k',Nd 'd')]"]
+
+
+
+
+
+["Nd 'a' : [] \n",
+
+"Nd 'b' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []})] \n"
+
+
+,"Nd 'd' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []})
+,(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []})] \n
+
+,"Nd 'k' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []})
+,(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []})
+,(Nd 'd',Labels {pre = 2, post = 2, hops = [], directs = []})] \n"
+
+,"Nd 'e' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []})    
+              ,(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []})
+,(Nd 'd',Labels {pre = 2, post = 5, hops = [], 
+
+
+
+
+
+directs = []})
+,(Nd 'k',Labels {pre = 3, post = 4, hops = [], directs = []})] \n"
+
+,"Nd 'g' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 6, hops = [], directs = []}),(Nd 'k',Labels {pre = 3, post = 4, hops = [], directs = []})] 
+
+\n","Nd 'i' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 6, hops = [], directs = []}),(Nd 'g',Labels {pre = 7, post = 7, hops = [], directs = []}),(Nd 'k',Labels {pre = 3, post = 4, hops = [], directs = []})] 
+'\n","Nd 'k' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 6, hops = [], directs = []}),(Nd 'g',Labels {pre = 7, post = 7, hops = [], directs = []}),(Nd 'i',Labels {pre = 8, post = 8, hops = [], directs = []}),(Nd 'k',Labels {pre = 3, post = 4, hops = [], directs = []})] \n",
+"Nd 'j' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 6, hops = [], directs = []}),(Nd 'g',Labels {pre = 7, post = 7, hops = [], directs = [Nd 'k']}),(Nd 'i',Labels {pre = 8, post = 10, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 9, hops = [], directs = []})] \n",
+"Nd 'k' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 6, hops = [], directs = []}),(Nd 'g',Labels {pre = 7, post = 7, hops = [], directs = [Nd 'k']}),(Nd 'i',Labels {pre = 8, post = 10, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 11, hops = [], directs = []}),(Nd 'k',Labels {pre = 3, post = 9, hops = [], directs = []})] \n",
+"Nd 'h' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 6, hops = [], directs = []}),(Nd 'g',Labels {pre = 7, post = 14, hops = [], directs = [Nd 'k']}),(Nd 'i',Labels {pre = 8, post = 10, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 13, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 12, hops = [], directs = []})] \n",
+"Nd 'k' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 6, hops = [], directs = []}),(Nd 'g',Labels {pre = 7, post = 14, hops = [], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 15, hops = [], directs = []}),(Nd 'i',Labels {pre = 8, post = 10, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 13, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 12, hops = [], directs = []})] \n",
+"Nd 'f' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'k']}),(Nd 'g',Labels {pre = 7, post = 14, hops = [], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 17, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 10, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 13, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 16, hops = [], directs = []})] \n",
+"Nd 'g' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'k']}),(Nd 'f',Labels {pre = 19, post = 19, hops = [], directs = []}),(Nd 'g',Labels {pre = 7, post = 14, hops = [], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 17, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 10, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 13, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 16, hops = [], directs = []})]
+ \n","Nd 'i' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = [Nd 'g']}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'k']}),(Nd 'f',Labels {pre = 19, post = 19, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {pre = 7, post = 14, hops = [], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 17, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 10, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 13, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 16, hops = [], directs = []})] \n","Nd 'k' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directsx = [Nd 'g']}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'i',Nd 'k']}),(Nd 'f',Labels {pre = 19, post = 19, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {pre = 7, post = 14, hops = [Nd 'i'], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 17, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 10, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 13, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 16, hops = [], directs = []})] \n","Nd 'j' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = [Nd 'g']}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'i',Nd 'k']}),(Nd 'f',Labels {pre = 19, post = 19, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {pre = 7, post = 14, hops = [Nd 'i'], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 17, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 21, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 13, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 20, hops = [], directs = []})] \n","Nd 'k' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 1, hops = [], directs = [Nd 'g']}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'i',Nd 'j',Nd 'k']}),(Nd 'f',Labels {pre = 19, post = 19, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {pre = 7, post = 14, hops = [Nd 'i',Nd 'j'], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 17, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 21, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 13, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 20, hops = [], directs = []})] \n","Nd 'c' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 26, hops = [], directs = [Nd 'g']}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'i',Nd 'j',Nd 'k']}),(Nd 'f',Labels {pre = 19, post = 25, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {pre = 7, post = 24, hops = [Nd 'i',Nd 'j'], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 17, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 21, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 23, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 22, hops = [], directs = []})] \n","Nd 'h' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = []}),(Nd 'b',Labels {pre = 1, post = 26, hops = [], directs = [Nd 'g']}),(Nd 'c',Labels {pre = 27, post = 27, hops = [], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'i',Nd 'j',Nd 'k']}),(Nd 'f',Labels {pre = 19, post = 25, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {pre = 7, post = 24, hops = [Nd 'i',Nd 'j'], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 17, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 21, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 23, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 22, hops = [], directs = []})] \n","Nd 'k' : [(Nd 'a',Labels {pre = 0, post = 0, hops = [], directs = [Nd 'h']}),(Nd 'b',Labels {pre = 1, post = 26, hops = [], directs = [Nd 'g']}),(Nd 'c',Labels {pre = 27, post = 27, hops = [Nd 'h'], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'i',Nd 'j',Nd 'k']}),(Nd 'f',Labels {pre = 19, post = 25, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {pre = 7, post = 24, hops = [Nd 'i',Nd 'j'], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 17, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 21, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 23, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 22, hops = [], directs = []})] \n","[(Nd 'a',Labels {pre = 0, post = 31, hops = [], directs = [Nd 'h']}),(Nd 'b',Labels {pre = 1, post = 26, hops = [], directs = [Nd 'g']}),(Nd 'c',Labels {pre = 27, post = 30, hops = [Nd 'h'], directs = []}),(Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {pre = 6, post = 18, hops = [], directs = [Nd 'i',Nd 'j',Nd 'k']}),(Nd 'f',Labels {pre = 19, post = 25, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {pre = 7, post = 24, hops = [Nd 'i',Nd 'j'], directs = [Nd 'k']}),(Nd 'h',Labels {pre = 15, post = 29, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {pre = 8, post = 21, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {pre = 11, post = 23, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {pre = 3, post = 28, hops = [], directs = []})]","[(Nd 'a',Nd 'a'),(Nd 'b',Nd 'a'),(Nd 'c',Nd 'a'),(Nd 'd',Nd 'b'),(Nd 'e',Nd 'b'),(Nd 'f',Nd 'b'),(Nd 'g',Nd 'e'),(Nd 'h',Nd 'e'),(Nd 'i',Nd 'g'),(Nd 'j',Nd 'g'),(Nd 'k',Nd 'd')]"]
+
+
+
+
+
+
+
+
+
+
+ ["[(Nd 'a',Labels {pre = 0, post = 21, hops = [], directs = [Nd 'h']}),
+ (Nd 'b',Labels {pre = 1, post = 18, hops = [], directs = [Nd 'g']}),
+ (Nd 'c',Labels {pre = 19, post = 20, hops = [Nd 'h'], directs = []}),
+ (Nd 'd',Labels {pre = 2, post = 5, hops = [], directs = []}),
+ (Nd 'e',Labels {pre = 6, post = 15, hops = [], directs = [Nd 'k']}),
+ (Nd 'f',Labels {pre = 16, post = 17, hops = [Nd 'g'], directs = []}),
+ (Nd 'g',Labels {pre = 7, post = 12, hops = [], directs = [Nd 'k']}),
+ (Nd 'h',Labels {pre = 13, post = 14, hops = [Nd 'k'], directs = []}),
+ (Nd 'i',Labels {pre = 8, post = 9, hops = [Nd 'k'], directs = []}),
+ (Nd 'j',Labels {pre = 10, post = 11, hops = [Nd 'k'], directs = []}),
+ (Nd 'k',Labels {pre = 3, post = 4, hops = [], directs = []})]
+ 
+ 
+ ","[(Nd 'a',Nd 'a'),(Nd 'b',Nd 'a'),(Nd 'c',Nd 'a'),(Nd 'd',Nd 'b'),(Nd 'e',Nd 'b'),(Nd 'f',Nd 'b'),(Nd 'g',Nd 'e'),(Nd 'h',Nd 'e'),(Nd 'i',Nd 'g'),(Nd 'j',Nd 'g'),(Nd 'k',Nd 'd')]"]
+
+
+
+["[(Nd 'a',Labels {tree_parent = Nd 'a', pre = 0, post = 21, hops = [], directs = [Nd 'c',Nd 'f',Nd 'h',Nd 'i',Nd 'j']}),
+(Nd 'b',Labels {tree_parent = Nd 'a', pre = 1, post = 18, hops = [], directs = [Nd 'f',Nd 'h',Nd 'i',Nd 'j']}),(Nd 'c',Labels {tree_parent = Nd 'a', pre = 19, post = 20, hops = [Nd 'h'], directs = []}),(Nd 'd',Labels {tree_parent = Nd 'b', pre = 2, post = 5, hops = [], directs = []}),(Nd 'e',Labels {tree_parent = Nd 'b', pre = 6, post = 15, hops = [], directs = [Nd 'h',Nd 'i',Nd 'j']}),(Nd 'f',Labels {tree_parent = Nd 'b', pre = 16, post = 17, hops = [Nd 'g'], directs = []}),(Nd 'g',Labels {tree_parent = Nd 'e', pre = 7, post = 12, hops = [], directs = [Nd 'i',Nd 'j']}),(Nd 'h',Labels {tree_parent = Nd 'e', pre = 13, post = 14, hops = [Nd 'k'], directs = []}),(Nd 'i',Labels {tree_parent = Nd 'g', pre = 8, post = 9, hops = [Nd 'k'], directs = []}),(Nd 'j',Labels {tree_parent = Nd 'g', pre = 10, post = 11, hops = [Nd 'k'], directs = []}),(Nd 'k',Labels {tree_parent = Nd 'd', pre = 3, post = 4, hops = [], directs = []})]","[(Nd 'a',Nd 'a'),(Nd 'b',Nd 'a'),(Nd 'c',Nd 'a'),(Nd 'd',Nd 'b'),(Nd 'e',Nd 'b'),(Nd 'f',Nd 'b'),(Nd 'g',Nd 'e'),(Nd 'h',Nd 'e'),(Nd 'i',Nd 'g'),(Nd 'j',Nd 'g'),(Nd 'k',Nd 'd')]"]
+
+
+
+
+
+
+
+["[(Nd 'a',Labels {tree_parent = Nd 'a', pre = 0, post = 21, hops = [], directs = [Nd 'c',Nd 'f',Nd 'h',Nd 'i',Nd 'j']}),
+(Nd 'b',Labels {tree_parent = Nd 'a', pre = 1, post = 18, hops = [], directs = [Nd 'f',Nd 'h',Nd 'i',Nd 'j']}),
+(Nd 'c',Labels {tree_parent = Nd 'a', pre = 19, post = 20, hops = [Nd 'h'], directs = []}),
+(Nd 'd',Labels {tree_parent = Nd 'b', pre = 2, post = 5, hops = [], directs = []}),
+(Nd 'e',Labels {tree_parent = Nd 'b', pre = 6, post = 15, hops = [], directs = [Nd 'h',Nd 'i',Nd 'j']}),
+(Nd 'f',Labels {tree_parent = Nd 'b', pre = 16, post = 17, hops = [Nd 'g'], directs = []}),
+(Nd 'g',Labels {tree_parent = Nd 'e', pre = 7, post = 12, hops = [], directs = [Nd 'i',Nd 'j']}),
+(Nd 'h',Labels {tree_parent = Nd 'e', pre = 13, post = 14, hops = [Nd 'k'], directs = []}),
+(Nd 'i',Labels {tree_parent = Nd 'g', pre = 8, post = 9, hops = [Nd 'k'], directs = []}),
+(Nd 'j',Labels {tree_parent = Nd 'g', pre = 10, post = 11, hops = [Nd 'k'], directs = []}),
+(Nd 'k',Labels {tree_parent = Nd 'd', pre = 3, post = 4, hops = [], directs = []})]","[(Nd 'a',Nd 'a'),(Nd 'b',Nd 'a'),(Nd 'c',Nd 'a'),(Nd 'd',Nd 'b'),(Nd 'e',Nd 'b'),(Nd 'f',Nd 'b'),(Nd 'g',Nd 'e'),(Nd 'h',Nd 'e'),(Nd 'i',Nd 'g'),(Nd 'j',Nd 'g'),(Nd 'k',Nd 'd')]"]
+
+
+
+
+
+
+
+
+

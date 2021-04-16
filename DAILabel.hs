@@ -22,6 +22,7 @@ type Hops = Set Nd
 type Directs = Set Nd
 type Pre = Int
 type Post = Int
+type Graph =  [(Nd, [Nd])]
 
 data Labels = Labels {
     tree_parent :: Nd,
@@ -51,13 +52,13 @@ initSt = St {
     nonTreeEdges -}
     }
 
-graph1 :: [(Nd, [Nd])]
+graph1 :: Graph
 graph1 = 
     [ (Nd 'a', [ Nd 'b', Nd 'c'] ),
       (Nd 'b', [ Nd 'c'] )
     ]
 
-graph2 :: [(Nd, [Nd])]
+graph2 :: Graph
 graph2 = 
     [ (Nd 'a', [ Nd 'b', Nd 'c'] ),
       (Nd 'b', [ Nd 'd', Nd 'e', Nd 'f' ] ),
@@ -145,3 +146,6 @@ updateDirects parent gp = do
     let Just ggp = Map.lookup gp parentnodes
     if (ggp == gp) then return()
     else updateDirects parent ggp
+
+search :: Graph -> Nd -> Nd -> MKDAILabel Bool
+search graph2 (Nd 'a') (Nd 'd') = undefined
