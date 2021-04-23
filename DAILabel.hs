@@ -86,7 +86,7 @@ process =  do
     tell [(show current_dailabel)]
     parentnodes <- gets parentNodes
     tell [(show parentnodes)]
-    flag <- search (Nd 'a') (Nd 'b')
+    flag <- search (Nd 'd') (Nd 'a')
     tell [(show flag)]
 
 updatePost :: Nd ->MKDAILabel()
@@ -182,3 +182,9 @@ search nd1 nd2 = do
                      then or <$> (mapM (\x -> query x nd2) (Set.toList dir1)) 
                 else return x
 
+
+deleteEdge :: Nd -> Nd -> MKDAILabel ()
+deleteEdge nd1 nd2 = undefined
+
+insertEdge :: Nd -> Nd -> MKDAILabel ()
+insertEdge nd1 nd2 = undefined
