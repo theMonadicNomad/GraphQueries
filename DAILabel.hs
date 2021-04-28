@@ -99,12 +99,27 @@ makeDynamicOperation input upState = do
             makeDynamicOperation updatedInput updatedState
         'D' ->do
             let (updatedInput, updatedState, w ) = runRWS (handleDelete (Nd firstChar) (Nd secondChar) ) input upState
-            print w 
+            print w
+            print (show updatedState) 
             makeDynamicOperation updatedInput updatedState
 
 
 handleInsert :: Nd -> Nd -> MKDAILabel Input
 handleInsert nd1 nd2 = undefined
+    input <- ask
+    let nodelist = Map.lookup nd1 input
+    case nodelist of 
+        Just ndlist -> do
+            let nodelist2 = Map.lookup nd2 input
+            case nodelist2 of
+                Just ndlist2 ->
+                _            ->
+                do
+        _ ->
+
+
+    let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
+
 
 
 -- | Updates the state by logic (tree edge and other conditions), Input graph.
@@ -112,21 +127,39 @@ handleDelete :: Nd -> Nd -> MKDAILabel Input
 handleDelete nd1 nd2 = do
     input <- ask
     istreeEdge <- isTreeEdge nd1 nd2
+    let newGraph = Map.fromList (removeEdgeFromGraph (Map.toList input) nd1 nd2)
     case istreeEdge of
                 True -> do
                     deleteDirectsandAncestors nd1 nd2
                     current_dailabel <- gets dailabel
                     tell [(show current_dailabel)]
                     reInitializeCounter 
-                    let newGraph = Map.fromList (removeEdgeFromGraph graph2 nd1 nd2)
                     tell [ show newGraph]
                     relabel newGraph nd1 nd2
                     updated_dailabel <- gets dailabel
-
                     tell ["UPDATED DAILABEL HERE"]
                     tell [(show updated_dailabel)]
-                    return input
-                False -> {- liftIO $  putStr("False") >> -} return input
+                    return newGraph
+                False -> do
+                    flag <- isTheOnlyNonTreeEdge nd1 nd2
+                    tell [(show flag)]
+                    if flag then
+                        do
+                            current_dailabel <- gets dailabel
+                            let label = Map.lookup nd1 current_dailabel
+                            case label of 
+                                Just (Labels trp pr ps hp dir) -> do
+                                    deleteSpecialNode nd1
+                                    deleteDirectsandAncestors trp nd1
+                                    if null dir then return ()
+                                    else 
+                                        addDirectsandAncestors trp dir
+                                _ -> error "invalid "
+                    else tell ["fromn else "] >> return ()
+                    deleteHops nd1 nd2
+{-                     current_dailabel <- gets dailabel
+                    tell[(show current_dailabel)] -}
+                    return newGraph
             
 
 reInitializeCounter :: MKDAILabel ()
@@ -144,13 +177,38 @@ remov remNode ys = [ y | y <- ys, y /= remNode]
 
 
 
+deleteSpecialNode :: Nd -> MKDAILabel ()
+deleteSpecialNode nd = do
+    current_specialnodes <- gets specialnodes
+    modify $ \st -> st { specialnodes = Set.delete nd current_specialnodes }
+
+
 deleteHops :: Nd -> Nd -> MKDAILabel()
-deleteHops nd1 nd2 = return ()
+deleteHops nd1 nd2 = do
+    current_dailabel <- gets dailabel
+    let label = Map.lookup nd1 current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> do
+                    (modify $ \st -> st { dailabel = Map.insert nd1 (Labels trp pr ps (Set.delete nd2 hp) dir) current_dailabel } )
+
+        Nothing -> error "error "
+
+addDirectsandAncestors :: Nd -> Set Nd -> MKDAILabel ()
+addDirectsandAncestors nd setdirs = do
+    current_dailabel <- gets dailabel
+    let label = Map.lookup nd current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> do
+            modify $ \st -> st{dailabel = Map.insert nd (Labels trp pr ps hp (Set.union dir setdirs)) current_dailabel}
+            if nd == trp then return ()
+            else addDirectsandAncestors trp setdirs
+        _ -> error "invalid"
 
 deleteDirectsandAncestors :: Nd -> Nd -> MKDAILabel ()
 deleteDirectsandAncestors nd1 nd2 = do
     current_dailabel <- gets dailabel
     let label = Map.lookup nd1 current_dailabel
+    tell[(show nd1 ++ " directs deletse :  " ++ show nd2)]
     case label of 
         Just (Labels trp pr ps hp dir) -> do
                     (modify $ \st -> st { dailabel = Map.insert nd1 (Labels trp pr ps hp (Set.delete nd2 dir)) current_dailabel } )
@@ -173,6 +231,20 @@ relabel input nd parent = do
         updatePost nd 
 
 
+
+isTheOnlyNonTreeEdge ::Nd -> Nd -> MKDAILabel Bool
+isTheOnlyNonTreeEdge nd1 nd2 = do
+    current_nonTreeEdges <- gets nonTreeEdges
+    case (elem (nd1, nd2)  current_nonTreeEdges) of
+        True -> if (countOfNonTreeEdges (Set.toList current_nonTreeEdges) nd1) == 1 then return True
+                else return False
+        False -> error " invalid entry "
+
+countOfNonTreeEdges :: [(Nd,Nd)] -> Nd -> Int
+countOfNonTreeEdges [] _ = 0
+countOfNonTreeEdges ((x,y):rest) ndd = if x == ndd then (1 + countOfNonTreeEdges rest ndd)
+                                   else countOfNonTreeEdges rest ndd
+
 isTreeEdge ::Nd -> Nd -> MKDAILabel Bool
 isTreeEdge nd1 nd2 = do
     current_treeEdges <- gets treeEdges
@@ -188,8 +260,11 @@ process =  do
     tell [(show parentnodes)]
     flag <- search (Nd 'd') (Nd 'a')
     tell [(show flag)]
+    tell [" tree edges ---------"]
     current_treeEdges <- gets treeEdges
     tell [(show current_treeEdges)]
+    tell [" non    tree edges ---------"]
+
     current_nonTreeEdges <- gets nonTreeEdges
     tell [(show current_nonTreeEdges)]
     current_hops <- gets hopnodes
@@ -202,12 +277,13 @@ updatePre nd = do
     current_dailabel <- gets dailabel
     current_counter <- gets counter
     let label = Map.lookup nd current_dailabel
+    tell ["from update pre-----------"]
     case label of
-        Just (Labels trp pr ps hp dir) -> case pr of
-                        ps -> return True
-                        _  -> do 
+        Just (Labels trp pr ps hp dir) -> if pr == ps then return True 
+                                          else do 
                             modify $ \st-> st {dailabel = Map.insert nd (Labels trp current_counter current_counter hp dir) current_dailabel,
                                                             counter = current_counter+1 }
+                            tell[( show nd ++  " : " ++ show current_counter ) ]
                             return False
         Nothing -> error "error"
 
