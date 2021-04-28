@@ -81,26 +81,26 @@ main = do
     let input = Map.fromList graph2
     let ((), upState, w) = runRWS (process) input initSt
     print w
-    updateGraph input upState 
+    makeDynamicOperation input upState 
 
 
-updateGraph :: Input-> St-> IO()
-updateGraph input upState = do
+makeDynamicOperation :: Input-> St-> IO()
+makeDynamicOperation input upState = do
     putStrLn ("Enter your choice for (I) for Edge Insertion or (D) for Edge Deletion : ")
     choice <- getChar
-    putStr (" Enter the first node of the edge that you want to update : ")
+    putStrLn (" Enter the first node of the edge that you want to update : ")
     firstChar <- getChar
-    putStr (" Enter the second node of the edge that you want to update : ")
+    putStrLn (" Enter the second node of the edge that you want to update : ")
     secondChar <- getChar
     case choice of
         'I' -> do
             let (updatedInput, updatedState, w ) = runRWS (handleInsert (Nd firstChar) (Nd secondChar) ) input upState
             print w 
-            updateGraph updatedInput updatedState
+            makeDynamicOperation updatedInput updatedState
         'D' ->do
             let (updatedInput, updatedState, w ) = runRWS (handleDelete (Nd firstChar) (Nd secondChar) ) input upState
             print w 
-            updateGraph updatedInput updatedState
+            makeDynamicOperation updatedInput updatedState
 
 
 handleInsert :: Nd -> Nd -> MKDAILabel Input
@@ -113,12 +113,65 @@ handleDelete nd1 nd2 = do
     input <- ask
     istreeEdge <- isTreeEdge nd1 nd2
     case istreeEdge of
-                True -> do 
-                    -- modify 
-                   -- liftIO $ putStr("True")
+                True -> do
+                    deleteDirectsandAncestors nd1 nd2
+                    current_dailabel <- gets dailabel
+                    tell [(show current_dailabel)]
+                    reInitializeCounter 
+                    let newGraph = Map.fromList (removeEdgeFromGraph graph2 nd1 nd2)
+                    tell [ show newGraph]
+                    relabel newGraph nd1 nd2
+                    updated_dailabel <- gets dailabel
+
+                    tell ["UPDATED DAILABEL HERE"]
+                    tell [(show updated_dailabel)]
                     return input
                 False -> {- liftIO $  putStr("False") >> -} return input
             
+
+reInitializeCounter :: MKDAILabel ()
+reInitializeCounter = do
+    current_counter <- gets counter
+    modify $ \st -> st { counter = 0 }
+
+
+
+removeEdgeFromGraph :: Graph -> Nd -> Nd -> Graph
+removeEdgeFromGraph graph nd1 nd2 = [ if x == nd1 then (x, remov nd2 y) else (x,y) | (x,y) <- graph]
+
+remov :: Nd ->[Nd] -> [Nd]
+remov remNode ys = [ y | y <- ys, y /= remNode] 
+
+
+
+deleteHops :: Nd -> Nd -> MKDAILabel()
+deleteHops nd1 nd2 = return ()
+
+deleteDirectsandAncestors :: Nd -> Nd -> MKDAILabel ()
+deleteDirectsandAncestors nd1 nd2 = do
+    current_dailabel <- gets dailabel
+    let label = Map.lookup nd1 current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> do
+                    (modify $ \st -> st { dailabel = Map.insert nd1 (Labels trp pr ps hp (Set.delete nd2 dir)) current_dailabel } )
+{-                                            hopnodes = Set.insert nd chops,
+                                           specialnodes = Set.insert parent current_specialnodes, 
+                                           treeEdges = Set.insert (parent, nd) current_nonTreeEdges -}      
+                    if nd1 == trp then return ()
+                    else deleteDirectsandAncestors trp nd2
+        Nothing -> error "error "
+
+relabel :: Input ->Nd -> Nd -> MKDAILabel ()
+relabel input nd parent = do
+    x <- updatePre nd 
+    unless x $ do
+        let fun = Map.lookup nd input
+        case fun of
+            Nothing       -> return ()
+            Just []       -> return () 
+            Just rest -> mapM_ (\x -> relabel input x nd) rest 
+        updatePost nd 
+
 
 isTreeEdge ::Nd -> Nd -> MKDAILabel Bool
 isTreeEdge nd1 nd2 = do
@@ -144,6 +197,19 @@ process =  do
     current_specialnodes <- gets specialnodes
     tell [(show current_specialnodes)]
 
+updatePre :: Nd ->MKDAILabel Bool
+updatePre nd = do 
+    current_dailabel <- gets dailabel
+    current_counter <- gets counter
+    let label = Map.lookup nd current_dailabel
+    case label of
+        Just (Labels trp pr ps hp dir) -> case pr of
+                        ps -> return True
+                        _  -> do 
+                            modify $ \st-> st {dailabel = Map.insert nd (Labels trp current_counter current_counter hp dir) current_dailabel,
+                                                            counter = current_counter+1 }
+                            return False
+        Nothing -> error "error"
 
 updatePost :: Nd ->MKDAILabel()
 updatePost nd = do 
@@ -160,6 +226,7 @@ processNodes nd parent = do
     inp <- ask
     x <- insertNodeinState nd parent
     unless x $ do
+        tell [(show x)]
         let fun = Map.lookup nd inp
         case fun of
             Nothing       -> return ()
