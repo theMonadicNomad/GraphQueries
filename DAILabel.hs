@@ -4,6 +4,8 @@ import Control.Monad.Reader
 import Control.Monad.State as CMS
 import Control.Monad.RWS
 import Data.List (intercalate)
+--import Control.Monad.IO.Unlift
+
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -37,10 +39,10 @@ data St = St {
     dailabel      :: Map Nd Labels,
     parentNodes  :: Map Nd Nd,
     counter      :: Int,
-    hopnodes     :: [Nd],
-    specialnodes :: [Nd]{- ,
-    nonTreeEdges :: (Nd, Nd) -}
-} deriving Show
+    hopnodes     :: Set Nd,
+    specialnodes :: Set Nd ,
+    treeEdges :: Set (Nd, Nd),
+    nonTreeEdges :: Set (Nd, Nd) } deriving Show
 
 
 initSt :: St
@@ -48,9 +50,10 @@ initSt = St {
     dailabel     = Map.empty,
     parentNodes = Map.empty,
     counter     = 0,
-    hopnodes        = [],
-    specialnodes    = []{- ,
-    nonTreeEdges -}
+    hopnodes        = Set.empty,
+    specialnodes    = Set.empty,
+    treeEdges = Set.empty,
+    nonTreeEdges = Set.empty
     }
 
 graph1 :: Graph
@@ -76,8 +79,52 @@ graph2 =
    
 main = do
     let input = Map.fromList graph2
-    let ((), w) = evalRWS (process) input initSt
+    let ((), upState, w) = runRWS (process) input initSt
     print w
+    updateGraph input upState 
+
+
+updateGraph :: Input-> St-> IO()
+updateGraph input upState = do
+    putStrLn ("Enter your choice for (I) for Edge Insertion or (D) for Edge Deletion : ")
+    choice <- getChar
+    putStr (" Enter the first node of the edge that you want to update : ")
+    firstChar <- getChar
+    putStr (" Enter the second node of the edge that you want to update : ")
+    secondChar <- getChar
+    case choice of
+        'I' -> do
+            let (updatedInput, updatedState, w ) = runRWS (handleInsert (Nd firstChar) (Nd secondChar) ) input upState
+            print w 
+            updateGraph updatedInput updatedState
+        'D' ->do
+            let (updatedInput, updatedState, w ) = runRWS (handleDelete (Nd firstChar) (Nd secondChar) ) input upState
+            print w 
+            updateGraph updatedInput updatedState
+
+
+handleInsert :: Nd -> Nd -> MKDAILabel Input
+handleInsert nd1 nd2 = undefined
+
+
+-- | Updates the state by logic (tree edge and other conditions), Input graph.
+handleDelete :: Nd -> Nd -> MKDAILabel Input
+handleDelete nd1 nd2 = do
+    input <- ask
+    istreeEdge <- isTreeEdge nd1 nd2
+    case istreeEdge of
+                True -> do 
+                    -- modify 
+                   -- liftIO $ putStr("True")
+                    return input
+                False -> {- liftIO $  putStr("False") >> -} return input
+            
+
+isTreeEdge ::Nd -> Nd -> MKDAILabel Bool
+isTreeEdge nd1 nd2 = do
+    current_treeEdges <- gets treeEdges
+    return $ elem (nd1, nd2)  current_treeEdges
+
 
 process :: MKDAILabel ()
 process =  do
@@ -88,6 +135,15 @@ process =  do
     tell [(show parentnodes)]
     flag <- search (Nd 'd') (Nd 'a')
     tell [(show flag)]
+    current_treeEdges <- gets treeEdges
+    tell [(show current_treeEdges)]
+    current_nonTreeEdges <- gets nonTreeEdges
+    tell [(show current_nonTreeEdges)]
+    current_hops <- gets hopnodes
+    tell [(show current_hops)]
+    current_specialnodes <- gets specialnodes
+    tell [(show current_specialnodes)]
+
 
 updatePost :: Nd ->MKDAILabel()
 updatePost nd = do 
@@ -116,19 +172,26 @@ insertNodeinState nd parent = do
     current_dailabel <- gets dailabel
     current_counter <- gets counter
     parentnodes <- gets parentNodes
+    current_treeEdges <- gets treeEdges
+    current_nonTreeEdges <- gets nonTreeEdges
+    current_specialnodes <- gets specialnodes
     chops <- gets hopnodes
    -- tell [(show nd ++ " : "++ show cailabel ++ " \\\n")]
     let label = Map.lookup nd current_dailabel
     case label of 
         Nothing -> (modify $ \st -> st { dailabel = Map.insert nd (Labels parent current_counter current_counter Set.empty Set.empty) current_dailabel,
                                          parentNodes    = Map.insert nd parent parentnodes, 
-                                        counter = current_counter+1 } ) >> pure False
+                                         counter = current_counter+1,
+                                         treeEdges = Set.insert (parent, nd) current_treeEdges
+                                        } ) >> pure False
         _       -> do
             let label = Map.lookup parent current_dailabel
             case label of 
                 Just (Labels trp pr ps hp dir) -> do
                      (modify $ \st -> st { dailabel = Map.insert parent (Labels trp pr ps (Set.insert nd hp) dir) current_dailabel,
-                                              hopnodes = nd:chops   } )
+                                           hopnodes = Set.insert nd chops,
+                                           specialnodes = Set.insert parent current_specialnodes,
+                                           nonTreeEdges = Set.insert (parent, nd) current_nonTreeEdges      } )
                      let grandparent = Map.lookup parent parentnodes
                      case grandparent of
                          Just gp -> updateDirects parent gp
