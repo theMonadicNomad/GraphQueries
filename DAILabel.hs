@@ -3,7 +3,7 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State as CMS
 import Control.Monad.RWS
-import Data.List (intercalate)
+import Data.List (intercalate,find)
 --import Control.Monad.IO.Unlift
 
 
@@ -42,7 +42,8 @@ data St = St {
     hopnodes     :: Set Nd,
     specialnodes :: Set Nd ,
     treeEdges :: Set (Nd, Nd),
-    nonTreeEdges :: Set (Nd, Nd) } deriving Show
+    nonTreeEdges :: Set (Nd, Nd),
+    maxID :: Int } deriving Show
 
 
 initSt :: St
@@ -53,7 +54,8 @@ initSt = St {
     hopnodes        = Set.empty,
     specialnodes    = Set.empty,
     treeEdges = Set.empty,
-    nonTreeEdges = Set.empty
+    nonTreeEdges = Set.empty,
+    maxID = 0
     }
 
 graph1 :: Graph
@@ -105,20 +107,83 @@ makeDynamicOperation input upState = do
 
 
 handleInsert :: Nd -> Nd -> MKDAILabel Input
-handleInsert nd1 nd2 = undefined
+handleInsert nd1 nd2 = do
+    isolated1 <- isIsolated nd1
+    isolated2 <- isIsolated nd2
+    special1 <- isSpecial nd1
+    special2 <- isSpecial nd2
+    hasparent2 <- hasParent nd2
     input <- ask
-    let nodelist = Map.lookup nd1 input
-    case nodelist of 
-        Just ndlist -> do
-            let nodelist2 = Map.lookup nd2 input
-            case nodelist2 of
-                Just ndlist2 ->
-                _            ->
-                do
-        _ ->
+    maxid <- gets maxID
+    current_dailabel <- gets dailabel
+    if isolated1 
+        then do
+            if isolated2 
+                then do
+                    let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
+                    (modify $ \st -> st { dailabel = Map.insert nd1 (Labels nd2 (maxid+1) (maxid+4) Set.empty Set.empty) current_dailabel  ,
+                                          maxID = maxid + 4,
+                                          counter = maxid +4 })
+                    updated_dailabel <- gets dailabel
+                    (modify $ \st -> st { dailabel = Map.insert nd2 (Labels nd2 (maxid+2) (maxid+3) Set.empty Set.empty) updated_dailabel } )
+                    return input
+            else if hasparent2
+                then do 
+                    let glabel = Map.lookup nd1 current_dailabel
+                    case glabel of 
+                        Just (Labels trp ppr pps php pdir) -> modify $ \st -> st { dailabel = Map.insert nd1 (Labels trp (maxid+1) (maxid+2) (Set.insert nd2 php) pdir) current_dailabel,
+                                                                                   maxID = maxid +2,
+                                                                                   counter = maxid+2 }
+                        Nothing -> error "error again "
+                    return input
+            else return  input
+    else 
+        do
+            if isolated2
+                then do
+                    let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
+                    relabel newGraph nd1 nd2
+                    return newGraph
+            else return input
 
 
-    let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
+                    
+
+
+
+
+
+{-     
+ -}
+hasParent :: Nd -> MKDAILabel Bool
+hasParent nd = do 
+    current_parentnodes <- gets parentNodes
+    let flag = Map.lookup nd current_parentnodes
+    case flag of 
+         Just nd -> return False
+         _       -> return True 
+
+insertEdgeinGraph :: Graph -> Nd -> Nd -> Graph
+insertEdgeinGraph graph nd1 nd2 = case (find (\c -> case c of (nd1, _) -> True ; _ -> False) graph) of
+    Just _ -> [ if x == nd1 then (x, nd2 : y) else (x,y) | (x,y) <- graph]
+    Nothing -> (nd1 ,[nd2]) :graph
+
+
+isIsolated :: Nd -> MKDAILabel Bool
+isIsolated nd = do
+    input <- ask
+    let nodelist = Map.lookup nd input
+    case nodelist of
+        Just ndlist -> return True
+        _           -> return False
+
+
+isSpecial :: Nd -> MKDAILabel Bool
+isSpecial nd =  do
+    current_specialnodes <- gets specialnodes
+    let flag = Set.member nd current_specialnodes
+    return flag
+
 
 
 
@@ -228,7 +293,8 @@ relabel input nd parent = do
             Nothing       -> return ()
             Just []       -> return () 
             Just rest -> mapM_ (\x -> relabel input x nd) rest 
-        updatePost nd 
+        updatePost nd
+        updateMax 
 
 
 
@@ -309,6 +375,13 @@ processNodes nd parent = do
             Just []       -> return () 
             Just rest -> mapM_ (\x -> processNodes x nd) rest 
         updatePost nd
+        updateMax 
+
+updateMax :: MKDAILabel ()
+updateMax = do 
+    current_counter <- gets counter
+    maxID <- gets maxID
+    modify $ \st -> st { maxID = current_counter}
 
 insertNodeinState :: Nd -> Nd -> MKDAILabel Bool
 insertNodeinState nd parent = do
