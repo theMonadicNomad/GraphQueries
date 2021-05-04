@@ -92,7 +92,9 @@ graph3 =
       (Nd 'i', [ Nd 'k' ] ),
       (Nd 'j', [ Nd 'k' ] ),
       (Nd 'k', [] ),
-      (Nd 'l', [] )
+      (Nd 'l', [Nd 'm'] ),
+      (Nd 'm', [])
+
     ]
   
    
@@ -161,7 +163,65 @@ handleInsert nd1 nd2 = do
                     let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
                     relabel newGraph nd1 nd2
                     return newGraph
-            else return input
+            else if hasparent2
+                then do 
+                    if special1
+                        then do
+                            addHop nd1 nd2 
+                            return input
+                    else 
+                        do
+                            parent1 <- getParent nd1
+                            addDirectinAncestors parent1 nd1
+                            addHop nd1 nd2 
+                            return input
+            else
+                do
+                    if special2
+                        then do
+                            addDirectinAncestors nd1 nd2
+
+                    else 
+                        do
+                            dir2 <- getDirects nd2
+                            addDirectsandAncestors nd1 dir2
+                    setTreeParent nd2 nd1
+                    --relabel nd1 nd2
+                    return input
+
+
+setTreeParent :: Nd -> Nd -> MKDAILabel ()
+setTreeParent nd1 nd2 = do 
+    current_dailabel <- gets dailabel
+    let label = Map.lookup nd1 current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> do
+                    (modify $ \st -> st { dailabel = Map.insert nd1 (Labels nd2 pr ps hp dir) current_dailabel } )
+
+        Nothing -> error "error "
+
+
+
+getParent :: Nd -> MKDAILabel Nd
+getParent nd = do
+    current_dailabel <- gets dailabel 
+    let label = Map.lookup nd current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> return trp
+        Nothing -> error "error "
+     
+
+getDirects :: Nd -> MKDAILabel Directs
+getDirects nd = do
+    current_dailabel <- gets dailabel 
+    let label = Map.lookup nd current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> return dir
+        Nothing -> error "error "
+
+
+
+
 
 hasParent :: Nd -> MKDAILabel Bool
 hasParent nd = do 
@@ -205,9 +265,11 @@ handleDelete nd1 nd2 = do
                 True -> do
                     deleteDirectsandAncestors nd1 nd2
                     current_dailabel <- gets dailabel
+                    tell ["before relabel DAILABEL HERE"]
                     tell [(show current_dailabel)]
                     reInitializeCounter 
                     tell [ show newGraph]
+                    removeTreeParent nd2
                     relabel newGraph nd1 nd2
                     updated_dailabel <- gets dailabel
                     tell ["UPDATED DAILABEL HERE"]
@@ -215,7 +277,7 @@ handleDelete nd1 nd2 = do
                     return newGraph
                 False -> do
                     flag <- isTheOnlyNonTreeEdge nd1 nd2
-                    tell [(show flag)]
+                    -- tell [(show flag)]
                     if flag then
                         do
                             current_dailabel <- gets dailabel
@@ -228,10 +290,10 @@ handleDelete nd1 nd2 = do
                                     else 
                                         addDirectsandAncestors trp dir
                                 _ -> error "invalid "
-                    else tell ["fromn else "] >> return ()
+                    else {- tell ["fromn else "] >> -} return ()
                     deleteHops nd1 nd2
-{-                     current_dailabel <- gets dailabel
-                    tell[(show current_dailabel)] -}
+                    current_dailabel <- gets dailabel
+                    -- tell[(show current_dailabel)]
                     return newGraph
             
 
@@ -239,6 +301,17 @@ reInitializeCounter :: MKDAILabel ()
 reInitializeCounter = do
     current_counter <- gets counter
     modify $ \st -> st { counter = 0 }
+
+removeTreeParent :: Nd -> MKDAILabel ()
+removeTreeParent nd = do
+    current_dailabel <- gets dailabel
+    let label = Map.lookup nd current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> do
+                    (modify $ \st -> st { dailabel = Map.insert nd (Labels nd pr ps hp dir) current_dailabel } )
+
+        Nothing -> error "error "
+
 
 
 
@@ -266,6 +339,30 @@ deleteHops nd1 nd2 = do
 
         Nothing -> error "error "
 
+
+addHop :: Nd -> Nd -> MKDAILabel ()
+addHop nd1 nd2 = do 
+    current_dailabel <- gets dailabel
+    let label = Map.lookup nd1 current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> do
+                    (modify $ \st -> st { dailabel = Map.insert nd1 (Labels trp pr ps (Set.insert nd2 hp) dir) current_dailabel } )
+
+        Nothing -> error "error "
+
+
+addDirectinAncestors :: Nd -> Nd -> MKDAILabel ()
+addDirectinAncestors anc d  = do
+    current_dailabel <- gets dailabel
+    let label = Map.lookup anc current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> do
+            modify $ \st -> st{dailabel = Map.insert anc (Labels trp pr ps hp (Set.insert d dir)) current_dailabel}
+            if anc == trp then return ()
+            else addDirectinAncestors trp d
+        _ -> error "invalid"
+
+
 addDirectsandAncestors :: Nd -> Set Nd -> MKDAILabel ()
 addDirectsandAncestors nd setdirs = do
     current_dailabel <- gets dailabel
@@ -281,7 +378,7 @@ deleteDirectsandAncestors :: Nd -> Nd -> MKDAILabel ()
 deleteDirectsandAncestors nd1 nd2 = do
     current_dailabel <- gets dailabel
     let label = Map.lookup nd1 current_dailabel
-    tell[(show nd1 ++ " directs deletse :  " ++ show nd2)]
+    -- tell[(show nd1 ++ " directs deletse :  " ++ show nd2)]
     case label of 
         Just (Labels trp pr ps hp dir) -> do
                     (modify $ \st -> st { dailabel = Map.insert nd1 (Labels trp pr ps hp (Set.delete nd2 dir)) current_dailabel } )
@@ -292,7 +389,7 @@ deleteDirectsandAncestors nd1 nd2 = do
                     else deleteDirectsandAncestors trp nd2
         Nothing -> error "error "
 
-relabel :: Input ->Nd -> Nd -> MKDAILabel ()
+relabel :: Input -> Nd -> Nd -> MKDAILabel ()
 relabel input nd parent = do
     x <- updatePre nd 
     unless x $ do
@@ -342,11 +439,11 @@ process :: MKDAILabel ()
 process =  do
     (processNodes (Nd 'a') (Nd 'a') ) 
     inp <- ask
-    let graph = Map.toList inp
-    mapM_ isProcessed [ x | (x,y) <- graph]
+{-     let graph = Map.toList inp
+    mapM_ isProcessed [ x | (x,y) <- graph] -}
     current_dailabel <- gets dailabel
     tell [(show current_dailabel)]
-    parentnodes <- gets parentNodes
+{-     parentnodes <- gets parentNodes
     tell [(show parentnodes)]
     flag <- search (Nd 'd') (Nd 'a')
     tell [(show flag)]
@@ -361,14 +458,14 @@ process =  do
     tell [(show current_hops)]
     current_specialnodes <- gets specialnodes
     tell [(show current_specialnodes)]
-
+ -}
 
 processNodes :: Nd -> Nd -> MKDAILabel()
 processNodes nd parent = do
     inp <- ask
     x <- insertNodeinState nd parent
     unless x $ do
-        tell [(show x)]
+        -- tell [(show x)]
         let fun = Map.lookup nd inp
         case fun of
             Nothing       -> return ()
@@ -388,7 +485,7 @@ updatePre nd = do
                                           else do 
                             modify $ \st-> st {dailabel = Map.insert nd (Labels trp current_counter current_counter hp dir) current_dailabel,
                                                             counter = current_counter+1 }
-                            tell[( show nd ++  " : " ++ show current_counter ) ]
+                            -- tell[( show nd ++  " : " ++ show current_counter ) ]
                             return False
         Nothing -> error "error"
 
