@@ -78,9 +78,26 @@ graph2 =
       (Nd 'j', [ Nd 'k' ] ),
       (Nd 'k', [] )
     ]
+
+graph3 :: Graph
+graph3 = 
+    [ (Nd 'a', [ Nd 'b', Nd 'c'] ),
+      (Nd 'b', [ Nd 'd', Nd 'e', Nd 'f' ] ),
+      (Nd 'c', [ Nd 'h' ] ),
+      (Nd 'd', [ Nd 'k' ] ),
+      (Nd 'e', [ Nd 'g', Nd 'h' ] ),
+      (Nd 'f', [ Nd 'g' ] ),
+      (Nd 'g', [ Nd 'i', Nd 'j' ] ),
+      (Nd 'h', [ Nd 'k' ] ),
+      (Nd 'i', [ Nd 'k' ] ),
+      (Nd 'j', [ Nd 'k' ] ),
+      (Nd 'k', [] ),
+      (Nd 'l', [] )
+    ]
+  
    
 main = do
-    let input = Map.fromList graph2
+    let input = Map.fromList graph3
     let ((), upState, w) = runRWS (process) input initSt
     print w
     makeDynamicOperation input upState 
@@ -146,15 +163,6 @@ handleInsert nd1 nd2 = do
                     return newGraph
             else return input
 
-
-                    
-
-
-
-
-
-{-     
- -}
 hasParent :: Nd -> MKDAILabel Bool
 hasParent nd = do 
     current_parentnodes <- gets parentNodes
@@ -317,9 +325,25 @@ isTreeEdge nd1 nd2 = do
     return $ elem (nd1, nd2)  current_treeEdges
 
 
+
+isProcessed :: Nd -> MKDAILabel ()
+isProcessed nd = do
+    current_dailabel <- gets dailabel
+    let label = Map.lookup nd current_dailabel
+{-     tell[" from is processed : " ++ show nd ++ " : "]
+    tell[(show label)]
+ -} case label of 
+        Nothing -> processNodes nd nd
+        _       -> return ()
+
+
+
 process :: MKDAILabel ()
 process =  do
     (processNodes (Nd 'a') (Nd 'a') ) 
+    inp <- ask
+    let graph = Map.toList inp
+    mapM_ isProcessed [ x | (x,y) <- graph]
     current_dailabel <- gets dailabel
     tell [(show current_dailabel)]
     parentnodes <- gets parentNodes
@@ -338,12 +362,27 @@ process =  do
     current_specialnodes <- gets specialnodes
     tell [(show current_specialnodes)]
 
+
+processNodes :: Nd -> Nd -> MKDAILabel()
+processNodes nd parent = do
+    inp <- ask
+    x <- insertNodeinState nd parent
+    unless x $ do
+        tell [(show x)]
+        let fun = Map.lookup nd inp
+        case fun of
+            Nothing       -> return ()
+            Just []       -> return () 
+            Just rest -> mapM_ (\x -> processNodes x nd) rest 
+        updatePost nd
+        updateMax 
+
 updatePre :: Nd ->MKDAILabel Bool
 updatePre nd = do 
     current_dailabel <- gets dailabel
     current_counter <- gets counter
     let label = Map.lookup nd current_dailabel
-    tell ["from update pre-----------"]
+    -- tell ["from update pre-----------"]
     case label of
         Just (Labels trp pr ps hp dir) -> if pr == ps then return True 
                                           else do 
@@ -362,20 +401,6 @@ updatePost nd = do
             Just (Labels trp pr ps hp dir) -> modify $ \st-> st {dailabel = Map.insert nd (Labels trp pr current_counter hp dir) current_dailabel,
                                                             counter = current_counter+1 }
             Nothing -> error "error"
-
-processNodes :: Nd -> Nd -> MKDAILabel()
-processNodes nd parent = do
-    inp <- ask
-    x <- insertNodeinState nd parent
-    unless x $ do
-        tell [(show x)]
-        let fun = Map.lookup nd inp
-        case fun of
-            Nothing       -> return ()
-            Just []       -> return () 
-            Just rest -> mapM_ (\x -> processNodes x nd) rest 
-        updatePost nd
-        updateMax 
 
 updateMax :: MKDAILabel ()
 updateMax = do 
