@@ -135,17 +135,17 @@ handleInsert nd1 nd2 = do
     input <- ask
     maxid <- gets maxID
     current_dailabel <- gets dailabel
+    let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
+
     if isolated1 
         then do
             if isolated2 
                 then do
-                    let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
                     (modify $ \st -> st { dailabel = Map.insert nd1 (Labels nd2 (maxid+1) (maxid+4) Set.empty Set.empty) current_dailabel  ,
                                           maxID = maxid + 4,
                                           counter = maxid +4 })
                     updated_dailabel <- gets dailabel
                     (modify $ \st -> st { dailabel = Map.insert nd2 (Labels nd2 (maxid+2) (maxid+3) Set.empty Set.empty) updated_dailabel } )
-                    return input
             else if hasparent2
                 then do 
                     let glabel = Map.lookup nd1 current_dailabel
@@ -154,41 +154,26 @@ handleInsert nd1 nd2 = do
                                                                                    maxID = maxid +2,
                                                                                    counter = maxid+2 }
                         Nothing -> error "error again "
-                    return input
-            else return  input
+            else return ()
     else 
         do
             if isolated2
-                then do
-                    let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
-                    relabel newGraph (Nd 'a') []
-        
-                    return newGraph
+                then relabel newGraph (Nd 'a') [] >> return ()
             else if hasparent2
                 then do 
                     if special1
-                        then do
-                            addHop nd1 nd2 
-                            return input
+                        then addHop nd1 nd2 
                     else 
-                        do
-                            parent1 <- getParent nd1
-                            addDirectinAncestors parent1 nd1
-                            addHop nd1 nd2 
-                            return input
+                        getParent nd1 >>= \parent1 -> addDirectinAncestors parent1 nd1 >> addHop nd1 nd2 
             else
                 do
                     if special2
-                        then do
-                            addDirectinAncestors nd1 nd2
-
+                        then addDirectinAncestors nd1 nd2
                     else 
-                        do
-                            dir2 <- getDirects nd2
-                            addDirectsandAncestors nd1 dir2
+                        getDirects nd2 >>= \dir2 -> addDirectsandAncestors nd1 dir2
                     setTreeParent nd2 nd1
-                    --relabel nd1 nd2
-                    return input
+                    relabel newGraph (Nd 'a') [] >> return ()
+    return newGraph
 
 
 setTreeParent :: Nd -> Nd -> MKDAILabel ()
