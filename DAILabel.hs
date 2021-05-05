@@ -121,7 +121,7 @@ makeDynamicOperation input upState = do
         'D' ->do
             let (updatedInput, updatedState, w ) = runRWS (handleDelete (Nd firstChar) (Nd secondChar) ) input upState
             print w
-            print (show updatedState) 
+            --print (show updatedState) 
             makeDynamicOperation updatedInput updatedState
 
 
@@ -136,7 +136,6 @@ handleInsert nd1 nd2 = do
     maxid <- gets maxID
     current_dailabel <- gets dailabel
     let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
-
     if isolated1 
         then do
             if isolated2 
@@ -240,8 +239,6 @@ isSpecial nd =  do
     return flag
 
 
-
-
 -- | Updates the state by logic (tree edge and other conditions), Input graph.
 handleDelete :: Nd -> Nd -> MKDAILabel Input
 handleDelete nd1 nd2 = do
@@ -282,7 +279,6 @@ handleDelete nd1 nd2 = do
                     current_dailabel <- gets dailabel
                     -- tell[(show current_dailabel)]
                     return newGraph
-            
 
 reInitializeCounter :: MKDAILabel ()
 reInitializeCounter = do
@@ -298,8 +294,6 @@ removeTreeParent nd = do
                     (modify $ \st -> st { dailabel = Map.insert nd (Labels nd pr ps hp dir) current_dailabel } )
 
         Nothing -> error "error "
-
-
 
 
 removeEdgeFromGraph :: Graph -> Nd -> Nd -> Graph
@@ -369,9 +363,6 @@ deleteDirectsandAncestors nd1 nd2 = do
     case label of 
         Just (Labels trp pr ps hp dir) -> do
                     (modify $ \st -> st { dailabel = Map.insert nd1 (Labels trp pr ps hp (Set.delete nd2 dir)) current_dailabel } )
-{-                                            hopnodes = Set.insert nd chops,
-                                           specialnodes = Set.insert parent current_specialnodes, 
-                                           treeEdges = Set.insert (parent, nd) current_nonTreeEdges -}      
                     if nd1 == trp then return ()
                     else deleteDirectsandAncestors trp nd2
         Nothing -> error "error "
@@ -478,7 +469,7 @@ updatePre nd visited = do
                                           else do 
                             modify $ \st-> st {dailabel = Map.insert nd (Labels trp current_counter current_counter hp dir) current_dailabel,
                                                             counter = current_counter+1 }
-                            tell[( show nd ++  " : " ++ show current_counter ) ]
+ --                           tell[( show nd ++  " : " ++ show current_counter ) ]
                             return False
         Nothing -> error "error"
 
