@@ -161,7 +161,8 @@ handleInsert nd1 nd2 = do
             if isolated2
                 then do
                     let newGraph = Map.fromList (insertEdgeinGraph (Map.toList input) nd1 nd2)
-                    relabel newGraph nd1 nd2
+                    relabel newGraph (Nd 'a') []
+        
                     return newGraph
             else if hasparent2
                 then do 
@@ -217,7 +218,7 @@ getDirects nd = do
     let label = Map.lookup nd current_dailabel
     case label of 
         Just (Labels trp pr ps hp dir) -> return dir
-        Nothing -> error "error "
+        Nothing -> error "error "1
 
 
 
@@ -229,10 +230,11 @@ hasParent nd = do
     let flag = Map.lookup nd current_parentnodes
     case flag of 
          Just nd -> return False
-         _       -> return True 
+         _       -> return True
+ 
 
 insertEdgeinGraph :: Graph -> Nd -> Nd -> Graph
-insertEdgeinGraph graph nd1 nd2 = case (find (\c -> case c of (nd1, _) -> True ; _ -> False) graph) of
+insertEdgeinGraph graph nd1 nd2 = case (find (\c -> fst c == nd1) graph) of
     Just _ -> [ if x == nd1 then (x, nd2 : y) else (x,y) | (x,y) <- graph]
     Nothing -> (nd1 ,[nd2]) :graph
 
@@ -270,7 +272,7 @@ handleDelete nd1 nd2 = do
                     reInitializeCounter 
                     tell [ show newGraph]
                     removeTreeParent nd2
-                    relabel newGraph nd1 nd2
+                    relabel newGraph (Nd 'a') []
                     updated_dailabel <- gets dailabel
                     tell ["UPDATED DAILABEL HERE"]
                     tell [(show updated_dailabel)]
@@ -389,18 +391,6 @@ deleteDirectsandAncestors nd1 nd2 = do
                     else deleteDirectsandAncestors trp nd2
         Nothing -> error "error "
 
-relabel :: Input -> Nd -> Nd -> MKDAILabel ()
-relabel input nd parent = do
-    x <- updatePre nd 
-    unless x $ do
-        let fun = Map.lookup nd input
-        case fun of
-            Nothing       -> return ()
-            Just []       -> return () 
-            Just rest -> mapM_ (\x -> relabel input x nd) rest 
-        updatePost nd
-        updateMax 
-
 
 
 isTheOnlyNonTreeEdge ::Nd -> Nd -> MKDAILabel Bool
@@ -474,18 +464,36 @@ processNodes nd parent = do
         updatePost nd
         updateMax 
 
-updatePre :: Nd ->MKDAILabel Bool
-updatePre nd = do 
+
+
+relabel :: Input -> Nd -> [Nd] -> MKDAILabel [Nd]
+relabel input nd visited = do
+    x <- updatePre nd visited
+    if x then return visited
+         else do
+            let fun = Map.lookup nd input
+            nv <- 
+               case fun of
+                    Nothing       -> return visited
+                    Just []       -> return visited 
+                    Just rest -> foldM (\acc y -> relabel input y acc) visited  rest 
+            updatePost nd
+            updateMax 
+            return (nd : nv)
+
+
+updatePre :: Nd -> [Nd] -> MKDAILabel Bool
+updatePre nd visited = do 
     current_dailabel <- gets dailabel
     current_counter <- gets counter
     let label = Map.lookup nd current_dailabel
     -- tell ["from update pre-----------"]
     case label of
-        Just (Labels trp pr ps hp dir) -> if pr == ps then return True 
+        Just (Labels trp pr ps hp dir) -> if pr == ps || elem nd visited then return True 
                                           else do 
                             modify $ \st-> st {dailabel = Map.insert nd (Labels trp current_counter current_counter hp dir) current_dailabel,
                                                             counter = current_counter+1 }
-                            -- tell[( show nd ++  " : " ++ show current_counter ) ]
+                            tell[( show nd ++  " : " ++ show current_counter ) ]
                             return False
         Nothing -> error "error"
 
