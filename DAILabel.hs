@@ -117,6 +117,7 @@ makeDynamicOperation input upState = do
         'I' -> do
             let (updatedInput, updatedState, w ) = runRWS (handleInsert (Nd firstChar) (Nd secondChar) ) input upState
             print w 
+            print (show updatedState) 
             makeDynamicOperation updatedInput updatedState
         'D' ->do
             let (updatedInput, updatedState, w ) = runRWS (handleDelete (Nd firstChar) (Nd secondChar) ) input upState
@@ -145,6 +146,7 @@ handleInsert nd1 nd2 = do
                                           counter = maxid +4 })
                     updated_dailabel <- gets dailabel
                     (modify $ \st -> st { dailabel = Map.insert nd2 (Labels nd2 (maxid+2) (maxid+3) Set.empty Set.empty) updated_dailabel } )
+                    tell[("HELLO1")]
             else if hasparent2
                 then do 
                     let glabel = Map.lookup nd1 current_dailabel
@@ -153,24 +155,27 @@ handleInsert nd1 nd2 = do
                                                                                    maxID = maxid +2,
                                                                                    counter = maxid+2 }
                         Nothing -> error "error again "
-            else return ()
+                    tell[("HELLO2")]
+
+            else tell[("HELLO3")] >> return ()
     else 
         do
             if isolated2
-                then relabel newGraph (Nd 'a') [] >> return ()
+                then relabel newGraph (Nd 'a') [] >> return () >> tell[("HELLO4")] 
             else if hasparent2
                 then do 
                     if special1
-                        then addHop nd1 nd2 
+                        then addHop nd1 nd2 >> tell[("HELLO5")] 
                     else 
-                        getParent nd1 >>= \parent1 -> addDirectinAncestors parent1 nd1 >> addHop nd1 nd2 
+                        getParent nd1 >>= \parent1 -> addDirectinAncestors parent1 nd1 >> addHop nd1 nd2 >> tell[("HELLO6")] 
             else
                 do
                     if special2
-                        then addDirectinAncestors nd1 nd2
+                        then addDirectinAncestors nd1 nd2 >> tell[("HELLO7")] 
                     else 
-                        getDirects nd2 >>= \dir2 -> addDirectsandAncestors nd1 dir2
+                        getDirects nd2 >>= \dir2 -> addDirectsandAncestors nd1 dir2 >> tell[("HELLO8")] 
                     setTreeParent nd2 nd1
+                    reInitializeCounter
                     relabel newGraph (Nd 'a') [] >> return ()
     return newGraph
 
@@ -225,11 +230,11 @@ insertEdgeinGraph graph nd1 nd2 = case (find (\c -> fst c == nd1) graph) of
 
 isIsolated :: Nd -> MKDAILabel Bool
 isIsolated nd = do
-    input <- ask
-    let nodelist = Map.lookup nd input
-    case nodelist of
-        Just ndlist -> return True
-        _           -> return False
+    current_dailabel <- gets dailabel
+    let label = Map.lookup nd current_dailabel
+    case label of 
+        Just (Labels trp pr ps hp dir) -> return False
+        _           -> return True
 
 
 isSpecial :: Nd -> MKDAILabel Bool
