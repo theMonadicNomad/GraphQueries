@@ -251,10 +251,10 @@ handleDelete nd1 nd2 = do
                     current_dailabel <- gets dailabel
                     tell ["before relabel DAILABEL HERE"]
                     tell [(show current_dailabel)]
-                    reInitializeCounter 
+                    --reInitializeCounter 
                     tell [ show newGraph]
                     removeTreeParent nd2
-                    relabel newGraph (Nd 'a') []
+                    relabel newGraph nd2 []
                     updated_dailabel <- gets dailabel
                     tell ["UPDATED DAILABEL HERE"]
                     tell [(show updated_dailabel)]
@@ -448,8 +448,7 @@ relabel input nd visited = do
     if x then return visited
          else do
             let fun = Map.lookup nd input
-            nv <- 
-               case fun of
+            nv <- case fun of
                     Nothing       -> return visited
                     Just []       -> return visited 
                     Just rest -> foldM (\acc y -> relabel input y acc) visited  rest 
