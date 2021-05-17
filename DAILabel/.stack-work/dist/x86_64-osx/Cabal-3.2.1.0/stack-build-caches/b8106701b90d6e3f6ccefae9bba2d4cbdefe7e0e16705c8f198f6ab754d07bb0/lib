@@ -1,0 +1,18 @@
+/Users/nagacharan/git/GraphQueries/DAILabel/src/Database/Daison/FFI.hsc:
+  hash: fff7c913a6c04d0fc51e3637f304c7c57ab2160006c9c3cc472a57eca18fe218
+/Users/nagacharan/git/GraphQueries/DAILabel/src/Database/Daison.hs:
+  hash: 9287bb5ecd55e59ed92252745c570f229dc19632402ffe156ba47b5e1a46d155
+/Users/nagacharan/git/GraphQueries/DAILabel/src/c/sqlite3Btree.c:
+  hash: fc71ce647c176c9cb47a172dcff8a3f2e5746b29a7e4c2c783663f5f57f7aeae
+/Users/nagacharan/git/GraphQueries/DAILabel/.stack-work/dist/x86_64-osx/Cabal-3.2.1.0/build/autogen/Paths_daison.hs:
+  hash: bbef4b2dbe01a292db21ea3e969d5a194ef932bc5dabe21d9a59fc003aefdede
+/Users/nagacharan/git/GraphQueries/DAILabel/daison.cabal:
+  hash: 8c6df363e4a77fd583b7f34fb08dfaf1b9854b2214faa3e8f01dd0f86d88f76b
+/Users/nagacharan/.stack/programs/x86_64-osx/ghc-8.10.4/lib/ghc-8.10.4/include/ghcversion.h:
+  hash: ddf0d2a5b1862138ade2de39566db63c5db748c6df9abc567bd8b7326ae3838a
+/Users/nagacharan/git/GraphQueries/DAILabel/.stack-work/dist/x86_64-osx/Cabal-3.2.1.0/build/autogen/cabal_macros.h:
+  hash: 91f4dc3dc6e59b1a14bfb0f01b8394e23ec63804f5f08c458c6caf90548ae259
+/Users/nagacharan/git/GraphQueries/DAILabel/package.yaml:
+  hash: 1ab4f7b32e9a987f168c7c16292438a044dba8ed1a368a691e5d1359438c29f9
+/Users/nagacharan/git/GraphQueries/DAILabel/src/Database/Daison/Serialize.hs:
+  hash: 9774b23a28cc1308d80b94765dd339168e4e9717f0cf8360f4bb5960252d915c
