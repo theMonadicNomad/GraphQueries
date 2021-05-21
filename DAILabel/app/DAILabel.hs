@@ -96,37 +96,23 @@ main = do
       --             (from people2)
     insertT
     select [ x | x <- from graph1 everything ]
---    head $ select [ x | x <- from counters (at 1) ]
+    select [ x | x <- from counters (at 1) ]
+    incrementCounter
+    resetCounter
+    getCounter
   print x
   closeDB db
 
 
-{- getCounter :: Daison Int
-getCounter =  do
-  p <- select [ x | x <- from counters (at 1) ]
-  let m = head p
-  let n = snd m 
-  return n
- -}
-
-
 getCounter :: Daison Int
-getCounter =  do
-  p <- select [ x | x <- from counters (at 1) ]
-  return (snd . head . p )
+getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
+-- f (g (h (x))) => (f  . g . h) x
 
+incrementCounter :: Daison ()
+incrementCounter = getCounter >>= \c_count -> update_ counters (return (1, ("counter", c_count+1) ))
 
-
-
-
-
-incrementCounter :: Daison Int
-incrementCounter = undefined
-
-resetCounter :: Daison Int
-resetCounter = undefined
-
-
+resetCounter :: Daison ()
+resetCounter = update_ counters (return (1, ("counter", 0) ))
 
 
 process :: Graph -> Daison ()

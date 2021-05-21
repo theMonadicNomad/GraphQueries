@@ -9,6 +9,9 @@ people :: Table (String, Int)
 people = table "people" `withIndex` people_name
 
 
+counter :: Table Int
+counter = table "counter"
+
 -- (name, id)
 -- create a index on name
 -- [ ("namex", (\(na, id) -> [na]))
