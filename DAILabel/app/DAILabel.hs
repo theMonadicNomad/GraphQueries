@@ -100,11 +100,12 @@ main = do
  -}    --update people2 (\_ (name,age,x) -> (name,age,10))
       --             (from people2)
     --insertT
-    select [ x | x <- from graph1Table everything ]
+{-     select [ x | x <- from graph1Table everything ]
     select [ x | x <- from counters (at 1) ]
     incrementCounter
     resetCounter
     getCounter
+ -} 
     select [ x | x <- from graph1Table everything ]
   print x
   closeDB db
@@ -131,15 +132,20 @@ insertNodeinDB node parent = do
   case record of
     [] -> do
       c_counter <- getCounter
-      incrementCounter
+      incrementCounter 
       insert graph1Table (return ( node, Labels parent c_counter c_counter Set.empty Set.empty ))    
       return False
-    [(ind, nd, label)] -> case label of 
-      (Labels trp pr ps hp dir) -> do
-        update_ graph1Table (return (ind,(node, Labels trp pr ps (Set.insert node hp) dir) ))
-        grandparent <- getParent parent
+    _   -> do
+      parent_record <- select [(ind2, nd2, labels2) | (ind2, (nd2, labels2)) <- from graph1Table everything , nd2 == parent  ] 
+      case parent_record of 
+        [] -> error "error "
+        [(indp, ndp, labelp)] -> case labelp of 
+          (Labels ptrp ppr pps php pdir) -> do
+
+            update_ graph1Table (return (indp,(ndp, Labels ptrp ppr pps (Set.insert node php) pdir) ))
+--           grandparent <- getParent parent
 --        updateDirects parent grandparent
-        return True
+      return True
 
 
     first : rest -> error "duplicate records in the database table, please verify"
