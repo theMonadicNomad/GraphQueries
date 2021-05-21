@@ -7,7 +7,9 @@ import           System.Environment
 import           Data.Data
 import Data.Set (Set)
 import qualified Data.Set as Set
-
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Control.Monad
 
 
 newtype Nd = Nd Char
@@ -18,6 +20,7 @@ type Directs = Set Nd
 type Pre = Int
 type Post = Int
 type Graph =  [(Nd, [Nd])]
+type GraphMap = Map Nd [Nd]
 
 
 type Distance = Int
@@ -67,12 +70,12 @@ instance Show Labels where
   show (Labels a b c d e ) = "TP: " ++  show a ++ " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e
 
 
-graph1 :: Table (Nd,Labels)
-graph1 = table "graph1"
+graph1Table :: Table (Nd,Labels)
+graph1Table = table "graph1"
            `withIndex` graph_index
 
 graph_index :: Index (Nd, Labels) Nd
-graph_index = index graph1 "node_index" fst
+graph_index = index graph1Table "node_index" fst
 
 
 counters :: Table (String, Int)
@@ -87,21 +90,61 @@ main :: IO ()
 main = do
   db <- openDB "test1.db"
   x  <- runDaison db ReadWriteMode $ do
-    tryCreateTable graph1
+    tryCreateTable graph1Table
     tryCreateTable counters
     insert counters (return ( "counter", 143 ))
+    let graphmap1 = Map.fromList graph2
+    process graphmap1
 {-     insert graph1 (return ( Nd 'a', Labels (Nd 'a') 1 10 Set.empty Set.empty ))
     insert graph1 (return ( Nd 'b', Labels (Nd 'a') 2 9 Set.empty Set.empty ))
  -}    --update people2 (\_ (name,age,x) -> (name,age,10))
       --             (from people2)
     insertT
-    select [ x | x <- from graph1 everything ]
+    select [ x | x <- from graph1Table everything ]
     select [ x | x <- from counters (at 1) ]
     incrementCounter
     resetCounter
     getCounter
   print x
   closeDB db
+
+process :: GraphMap -> Daison ()
+process graphmap = do
+  let firstnode = fst $ Map.elemAt 0 graphmap
+  processNodes graphmap firstnode firstnode
+
+processNodes :: GraphMap -> Nd -> Nd -> Daison()
+processNodes graph nd parent = do
+  x <- insertNodeinDB nd parent
+  unless x $ do
+    let adjacent = Map.lookup nd graph
+    case adjacent of
+      Nothing -> return ()
+      Just []      -> return ()
+      Just rest    -> mapM_ (\x -> processNodes graph x nd ) rest
+
+insertNodeinDB :: Nd -> Nd -> Daison Bool
+insertNodeinDB node parent = do
+  record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == node  ] 
+  case record of
+    [] -> do
+      c_counter <- getCounter
+      insert graph1Table (return ( node, Labels parent c_counter c_counter Set.empty Set.empty ))    
+      return False
+    [(ind, nd, label)] -> case label of 
+      (Labels trp pr ps hp dir) -> do
+        update_ graph1Table (return (ind,(node, Labels trp pr ps (Set.insert node hp) dir) ))
+        return True
+
+
+    first : rest -> error "duplicate records in the database table, please verify"
+    
+  return True
+--updatePost :: Graph -> Nd -> Daison ()
+
+
+getParent :: Nd -> Daison Nd
+getParent nd = undefined
 
 
 getCounter :: Daison Int
@@ -115,21 +158,12 @@ resetCounter :: Daison ()
 resetCounter = update_ counters (return (1, ("counter", 0) ))
 
 
-process :: Graph -> Daison ()
-process graph = processNodes graph (Nd 'a') (Nd 'a')
-
-
-processNodes :: Graph -> Nd -> Nd -> Daison()
-processNodes graph nd parent = undefined
-
-
---updatePost :: Graph -> Nd -> Daison ()
 
 
 
 insertT :: Daison (Key (Nd, Labels), Key (Nd, Labels))
 insertT = do
-  insert graph1 (return ( Nd 'a', Labels (Nd 'a') 1 10 Set.empty Set.empty ))
-  insert graph1 (return ( Nd 'b', Labels (Nd 'a') 2 9 Set.empty Set.empty ))
+  insert graph1Table (return ( Nd 'a', Labels (Nd 'a') 1 10 Set.empty Set.empty ))
+  insert graph1Table (return ( Nd 'b', Labels (Nd 'a') 2 9 Set.empty Set.empty ))
 
 
