@@ -141,17 +141,13 @@ insertNodeinDB node parent = do
         [] -> error "error "
         [(indp, ndp, labelp)] -> case labelp of 
           (Labels ptrp ppr pps php pdir) -> do
-
             update_ graph1Table (return (indp,(ndp, Labels ptrp ppr pps (Set.insert node php) pdir) ))
---           grandparent <- getParent parent
---        updateDirects parent grandparent
+            updateDirects ndp ptrp
+ --           grandparent <- getParent parent
+--            updateDirects parent grandparent
       return True
-
-
     first : rest -> error "duplicate records in the database table, please verify"
     
- -- return True
-
 updatePost :: Nd -> Daison ()
 updatePost node = do 
   record <- select [(ind, nd, label) | (ind, (nd, label)) <- from graph1Table everything , nd == node  ] 
@@ -166,13 +162,17 @@ updatePost node = do
 
 
 
-{- updateDirects :: Nd -> Nd -> Daison()
+updateDirects :: Nd -> Nd -> Daison()
 updateDirects parent gp = do
-  record <- select [(ind, nd, label) | (ind, (nd, labels)) <- from graph1Table everything , nd == gp  ] 
+  record <- select [(ind1, nd1, label1) | (ind1, (nd1, label1)) <- from graph1Table everything , nd1 == gp  ] 
   case record of 
     [(ind, nd, label)] -> case label of
-      Labels trp pr ps hp dir ->  
- -}
+      Labels trp pr ps hp dir ->  do
+        update_ graph1Table (return (ind,(nd, Labels trp pr ps hp (Set.insert parent dir)) ))
+      _ -> error "updatedirects error"
+  ggp <- getParent gp
+  if(ggp == gp) then return ()
+  else updateDirects parent ggp
 
 
 
@@ -181,8 +181,8 @@ getParent node = do
   record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == node  ] 
   case record of
     [] -> error "invalid parent node"
-    [(ind, nd, label)] -> case label of 
-      (Labels trp pr _ _ _) -> return nd
+    [(ind1, nd1, label1)] -> case label1 of 
+      (Labels trp _ _ _ _) -> return trp
     _           -> error "multiple parents error "
 
 
