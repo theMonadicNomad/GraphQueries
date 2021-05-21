@@ -95,17 +95,6 @@ main = do
     insert counters (return ( "counter", 0 ))
     let graphmap1 = Map.fromList graph2
     process graphmap1
-{-     insert graph1 (return ( Nd 'a', Labels (Nd 'a') 1 10 Set.empty Set.empty ))
-    insert graph1 (return ( Nd 'b', Labels (Nd 'a') 2 9 Set.empty Set.empty ))
- -}    --update people2 (\_ (name,age,x) -> (name,age,10))
-      --             (from people2)
-    --insertT
-{-     select [ x | x <- from graph1Table everything ]
-    select [ x | x <- from counters (at 1) ]
-    incrementCounter
-    resetCounter
-    getCounter
- -} 
     select [ x | x <- from graph1Table everything ]
   print x
   closeDB db
@@ -143,8 +132,6 @@ insertNodeinDB node parent = do
           (Labels ptrp ppr pps php pdir) -> do
             update_ graph1Table (return (indp,(ndp, Labels ptrp ppr pps (Set.insert node php) pdir) ))
             updateDirects ndp ptrp
- --           grandparent <- getParent parent
---            updateDirects parent grandparent
       return True
     first : rest -> error "duplicate records in the database table, please verify"
     
@@ -160,8 +147,6 @@ updatePost node = do
       _   -> error "error from updatepost"
     _ -> error "error " 
 
-
-
 updateDirects :: Nd -> Nd -> Daison()
 updateDirects parent gp = do
   record <- select [(ind1, nd1, label1) | (ind1, (nd1, label1)) <- from graph1Table everything , nd1 == gp  ] 
@@ -174,8 +159,6 @@ updateDirects parent gp = do
   if(ggp == gp) then return ()
   else updateDirects parent ggp
 
-
-
 getParent :: Nd -> Daison Nd
 getParent node = do
   record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == node  ] 
@@ -185,24 +168,13 @@ getParent node = do
       (Labels trp _ _ _ _) -> return trp
     _           -> error "multiple parents error "
 
-
 getCounter :: Daison Int
 getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
--- f (g (h (x))) => (f  . g . h) x
 
 incrementCounter :: Daison ()
 incrementCounter = getCounter >>= \c_counter -> update_ counters (return (1, ("counter", c_counter+1) ))
 
 resetCounter :: Daison ()
 resetCounter = update_ counters (return (1, ("counter", 0) ))
-
-
-
-
-
-insertT :: Daison (Key (Nd, Labels), Key (Nd, Labels))
-insertT = do
-  insert graph1Table (return ( Nd 'a', Labels (Nd 'a') 1 10 Set.empty Set.empty ))
-  insert graph1Table (return ( Nd 'b', Labels (Nd 'a') 2 9 Set.empty Set.empty ))
 
 
