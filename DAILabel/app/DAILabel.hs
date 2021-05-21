@@ -92,19 +92,20 @@ main = do
   x  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable counters
-    insert counters (return ( "counter", 143 ))
+    insert counters (return ( "counter", 0 ))
     let graphmap1 = Map.fromList graph2
     process graphmap1
 {-     insert graph1 (return ( Nd 'a', Labels (Nd 'a') 1 10 Set.empty Set.empty ))
     insert graph1 (return ( Nd 'b', Labels (Nd 'a') 2 9 Set.empty Set.empty ))
  -}    --update people2 (\_ (name,age,x) -> (name,age,10))
       --             (from people2)
-    insertT
+    --insertT
     select [ x | x <- from graph1Table everything ]
     select [ x | x <- from counters (at 1) ]
     incrementCounter
     resetCounter
     getCounter
+    select [ x | x <- from graph1Table everything ]
   print x
   closeDB db
 
@@ -122,6 +123,7 @@ processNodes graph nd parent = do
       Nothing -> return ()
       Just []      -> return ()
       Just rest    -> mapM_ (\x -> processNodes graph x nd ) rest
+    updatePost nd
 
 insertNodeinDB :: Nd -> Nd -> Daison Bool
 insertNodeinDB node parent = do
@@ -129,22 +131,53 @@ insertNodeinDB node parent = do
   case record of
     [] -> do
       c_counter <- getCounter
+      incrementCounter
       insert graph1Table (return ( node, Labels parent c_counter c_counter Set.empty Set.empty ))    
       return False
     [(ind, nd, label)] -> case label of 
       (Labels trp pr ps hp dir) -> do
         update_ graph1Table (return (ind,(node, Labels trp pr ps (Set.insert node hp) dir) ))
+        grandparent <- getParent parent
+--        updateDirects parent grandparent
         return True
 
 
     first : rest -> error "duplicate records in the database table, please verify"
     
-  return True
---updatePost :: Graph -> Nd -> Daison ()
+ -- return True
+
+updatePost :: Nd -> Daison ()
+updatePost node = do 
+  record <- select [(ind, nd, label) | (ind, (nd, label)) <- from graph1Table everything , nd == node  ] 
+  case record of 
+    [(ind, nd, label)] -> case label of
+      Labels trp pr ps hp dir ->  do 
+        c_counter <- getCounter
+        incrementCounter
+        update_ graph1Table (return (ind,(nd, Labels trp pr c_counter hp dir) ))
+      _   -> error "error from updatepost"
+    _ -> error "error " 
+
+
+
+{- updateDirects :: Nd -> Nd -> Daison()
+updateDirects parent gp = do
+  record <- select [(ind, nd, label) | (ind, (nd, labels)) <- from graph1Table everything , nd == gp  ] 
+  case record of 
+    [(ind, nd, label)] -> case label of
+      Labels trp pr ps hp dir ->  
+ -}
+
 
 
 getParent :: Nd -> Daison Nd
-getParent nd = undefined
+getParent node = do
+  record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == node  ] 
+  case record of
+    [] -> error "invalid parent node"
+    [(ind, nd, label)] -> case label of 
+      (Labels trp pr _ _ _) -> return nd
+    _           -> error "multiple parents error "
 
 
 getCounter :: Daison Int
@@ -152,7 +185,7 @@ getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . h
 -- f (g (h (x))) => (f  . g . h) x
 
 incrementCounter :: Daison ()
-incrementCounter = getCounter >>= \c_count -> update_ counters (return (1, ("counter", c_count+1) ))
+incrementCounter = getCounter >>= \c_counter -> update_ counters (return (1, ("counter", c_counter+1) ))
 
 resetCounter :: Daison ()
 resetCounter = update_ counters (return (1, ("counter", 0) ))
