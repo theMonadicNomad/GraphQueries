@@ -105,6 +105,135 @@ main = do
     makeDynamicOperation input upState 
 
 
+process :: MKDAILabel ()
+process =  do
+    (processNodes (Nd 'a') (Nd 'a') ) 
+    inp <- ask
+{-     let graph = Map.toList inp
+    mapM_ isProcessed [ x | (x,y) <- graph] -}
+    current_dailabel <- gets dailabel
+    tell [(show current_dailabel)]
+{-     parentnodes <- gets parentNodes
+    tell [(show parentnodes)]
+    flag <- search (Nd 'd') (Nd 'a')
+    tell [(show flag)]
+    tell [" tree edges ---------"]
+    current_treeEdges <- gets treeEdges
+    tell [(show current_treeEdges)]
+    tell [" non    tree edges ---------"]
+
+    current_nonTreeEdges <- gets nonTreeEdges
+    tell [(show current_nonTreeEdges)]
+    current_hops <- gets hopnodes
+    tell [(show current_hops)]
+    current_specialnodes <- gets specialnodes
+    tell [(show current_specialnodes)]
+ -}
+
+processNodes :: Nd -> Nd -> MKDAILabel()
+processNodes nd parent = do
+    inp <- ask
+    x <- insertNodeinState nd parent
+    unless x $ do
+        -- tell [(show x)]
+        let fun = Map.lookup nd inp
+        case fun of
+            Nothing       -> return ()
+            Just []       -> return () 
+            Just rest -> mapM_ (\x -> processNodes x nd) rest 
+        updatePost nd
+        updateMax 
+
+insertNodeinState :: Nd -> Nd -> MKDAILabel Bool
+insertNodeinState nd parent = do
+    current_dailabel <- gets dailabel
+    current_counter <- gets counter
+    parentnodes <- gets parentNodes
+    current_treeEdges <- gets treeEdges
+    current_nonTreeEdges <- gets nonTreeEdges
+    current_specialnodes <- gets specialnodes
+    chops <- gets hopnodes
+   -- tell [(show nd ++ " : "++ show cailabel ++ " \\\n")]
+    let label = Map.lookup nd current_dailabel
+    case label of 
+        Nothing -> (modify $ \st -> st { dailabel = Map.insert nd (Labels parent current_counter current_counter Set.empty Set.empty) current_dailabel,
+                                         parentNodes    = Map.insert nd parent parentnodes, 
+                                         counter = current_counter+1,
+                                         treeEdges = Set.insert (parent, nd) current_treeEdges
+                                        } ) >> pure False
+        _       -> do
+            let label = Map.lookup parent current_dailabel
+            case label of 
+                Just (Labels trp pr ps hp dir) -> do
+                     (modify $ \st -> st { dailabel = Map.insert parent (Labels trp pr ps (Set.insert nd hp) dir) current_dailabel,
+                                           hopnodes = Set.insert nd chops,
+                                           specialnodes = Set.insert parent current_specialnodes,
+                                           nonTreeEdges = Set.insert (parent, nd) current_nonTreeEdges      } )
+                     let grandparent = Map.lookup parent parentnodes
+                     case grandparent of
+                         Just gp -> updateDirects parent gp
+                         Nothing -> error "error grandparent"
+                Nothing -> error "error "
+            pure True
+
+updatePre :: Nd -> [Nd] -> MKDAILabel Bool
+updatePre nd visited = do 
+    current_dailabel <- gets dailabel
+    current_counter <- gets counter
+    let label = Map.lookup nd current_dailabel
+    -- tell ["from update pre-----------"]
+    case label of
+        Just (Labels trp pr ps hp dir) -> if pr == ps || elem nd visited then return True 
+                                          else do 
+                            modify $ \st-> st {dailabel = Map.insert nd (Labels trp current_counter current_counter hp dir) current_dailabel,
+                                                            counter = current_counter+1 }
+ --                           tell[( show nd ++  " : " ++ show current_counter ) ]
+                            return False
+        Nothing -> error "error"
+
+updatePost :: Nd ->MKDAILabel()
+updatePost nd = do 
+    current_dailabel <- gets dailabel
+    current_counter <- gets counter
+    let label = Map.lookup nd current_dailabel
+    case label of
+            Just (Labels trp pr ps hp dir) -> modify $ \st-> st {dailabel = Map.insert nd (Labels trp pr current_counter hp dir) current_dailabel,
+                                                            counter = current_counter+1 }
+            Nothing -> error "error"
+
+updateMax :: MKDAILabel ()
+updateMax = do 
+    current_counter <- gets counter
+    maxID <- gets maxID
+    modify $ \st -> st { maxID = current_counter}
+
+
+updateDirects :: Nd -> Nd -> MKDAILabel()
+updateDirects parent gp = do
+    current_dailabel <- gets dailabel
+    let glabel = Map.lookup gp current_dailabel
+    case glabel of 
+        Just (Labels trp ppr pps php pdir) -> modify $ \st -> st { dailabel = Map.insert gp (Labels trp ppr pps php (Set.insert parent pdir) ) current_dailabel}
+        Nothing -> error "error again "
+    parentnodes <- gets parentNodes
+    let Just ggp = Map.lookup gp parentnodes
+    if (ggp == gp) then return()
+    else updateDirects parent ggp
+
+relabel :: Input -> Nd -> [Nd] -> MKDAILabel [Nd]
+relabel input nd visited = do
+    x <- updatePre nd visited
+    if x then return visited
+         else do
+            let fun = Map.lookup nd input
+            nv <- case fun of
+                    Nothing       -> return visited
+                    Just []       -> return visited 
+                    Just rest -> foldM (\acc y -> relabel input y acc) visited  rest 
+            updatePost nd
+            updateMax 
+            return (nd : nv)
+
 makeDynamicOperation :: Input-> St-> IO()
 makeDynamicOperation input upState = do
     putStrLn ("Enter your choice for (I) for Edge Insertion or (D) for Edge Deletion : ")
@@ -307,8 +436,6 @@ removeEdgeFromGraph graph nd1 nd2 = [ if x == nd1 then (x, remov nd2 y) else (x,
 remov :: Nd ->[Nd] -> [Nd]
 remov remNode ys = [ y | y <- ys, y /= remNode] 
 
-
-
 deleteSpecialNode :: Nd -> MKDAILabel ()
 deleteSpecialNode nd = do
     current_specialnodes <- gets specialnodes
@@ -373,7 +500,6 @@ deleteDirectsandAncestors nd1 nd2 = do
         Nothing -> error "error "
 
 
-
 isTheOnlyNonTreeEdge ::Nd -> Nd -> MKDAILabel Bool
 isTheOnlyNonTreeEdge nd1 nd2 = do
     current_nonTreeEdges <- gets nonTreeEdges
@@ -393,7 +519,6 @@ isTreeEdge nd1 nd2 = do
     return $ elem (nd1, nd2)  current_treeEdges
 
 
-
 isProcessed :: Nd -> MKDAILabel ()
 isProcessed nd = do
     current_dailabel <- gets dailabel
@@ -403,142 +528,6 @@ isProcessed nd = do
  -} case label of 
         Nothing -> processNodes nd nd
         _       -> return ()
-
-
-
-process :: MKDAILabel ()
-process =  do
-    (processNodes (Nd 'a') (Nd 'a') ) 
-    inp <- ask
-{-     let graph = Map.toList inp
-    mapM_ isProcessed [ x | (x,y) <- graph] -}
-    current_dailabel <- gets dailabel
-    tell [(show current_dailabel)]
-{-     parentnodes <- gets parentNodes
-    tell [(show parentnodes)]
-    flag <- search (Nd 'd') (Nd 'a')
-    tell [(show flag)]
-    tell [" tree edges ---------"]
-    current_treeEdges <- gets treeEdges
-    tell [(show current_treeEdges)]
-    tell [" non    tree edges ---------"]
-
-    current_nonTreeEdges <- gets nonTreeEdges
-    tell [(show current_nonTreeEdges)]
-    current_hops <- gets hopnodes
-    tell [(show current_hops)]
-    current_specialnodes <- gets specialnodes
-    tell [(show current_specialnodes)]
- -}
-
-processNodes :: Nd -> Nd -> MKDAILabel()
-processNodes nd parent = do
-    inp <- ask
-    x <- insertNodeinState nd parent
-    unless x $ do
-        -- tell [(show x)]
-        let fun = Map.lookup nd inp
-        case fun of
-            Nothing       -> return ()
-            Just []       -> return () 
-            Just rest -> mapM_ (\x -> processNodes x nd) rest 
-        updatePost nd
-        updateMax 
-
-
-
-relabel :: Input -> Nd -> [Nd] -> MKDAILabel [Nd]
-relabel input nd visited = do
-    x <- updatePre nd visited
-    if x then return visited
-         else do
-            let fun = Map.lookup nd input
-            nv <- case fun of
-                    Nothing       -> return visited
-                    Just []       -> return visited 
-                    Just rest -> foldM (\acc y -> relabel input y acc) visited  rest 
-            updatePost nd
-            updateMax 
-            return (nd : nv)
-
-
-updatePre :: Nd -> [Nd] -> MKDAILabel Bool
-updatePre nd visited = do 
-    current_dailabel <- gets dailabel
-    current_counter <- gets counter
-    let label = Map.lookup nd current_dailabel
-    -- tell ["from update pre-----------"]
-    case label of
-        Just (Labels trp pr ps hp dir) -> if pr == ps || elem nd visited then return True 
-                                          else do 
-                            modify $ \st-> st {dailabel = Map.insert nd (Labels trp current_counter current_counter hp dir) current_dailabel,
-                                                            counter = current_counter+1 }
- --                           tell[( show nd ++  " : " ++ show current_counter ) ]
-                            return False
-        Nothing -> error "error"
-
-updatePost :: Nd ->MKDAILabel()
-updatePost nd = do 
-    current_dailabel <- gets dailabel
-    current_counter <- gets counter
-    let label = Map.lookup nd current_dailabel
-    case label of
-            Just (Labels trp pr ps hp dir) -> modify $ \st-> st {dailabel = Map.insert nd (Labels trp pr current_counter hp dir) current_dailabel,
-                                                            counter = current_counter+1 }
-            Nothing -> error "error"
-
-updateMax :: MKDAILabel ()
-updateMax = do 
-    current_counter <- gets counter
-    maxID <- gets maxID
-    modify $ \st -> st { maxID = current_counter}
-
-insertNodeinState :: Nd -> Nd -> MKDAILabel Bool
-insertNodeinState nd parent = do
-    current_dailabel <- gets dailabel
-    current_counter <- gets counter
-    parentnodes <- gets parentNodes
-    current_treeEdges <- gets treeEdges
-    current_nonTreeEdges <- gets nonTreeEdges
-    current_specialnodes <- gets specialnodes
-    chops <- gets hopnodes
-   -- tell [(show nd ++ " : "++ show cailabel ++ " \\\n")]
-    let label = Map.lookup nd current_dailabel
-    case label of 
-        Nothing -> (modify $ \st -> st { dailabel = Map.insert nd (Labels parent current_counter current_counter Set.empty Set.empty) current_dailabel,
-                                         parentNodes    = Map.insert nd parent parentnodes, 
-                                         counter = current_counter+1,
-                                         treeEdges = Set.insert (parent, nd) current_treeEdges
-                                        } ) >> pure False
-        _       -> do
-            let label = Map.lookup parent current_dailabel
-            case label of 
-                Just (Labels trp pr ps hp dir) -> do
-                     (modify $ \st -> st { dailabel = Map.insert parent (Labels trp pr ps (Set.insert nd hp) dir) current_dailabel,
-                                           hopnodes = Set.insert nd chops,
-                                           specialnodes = Set.insert parent current_specialnodes,
-                                           nonTreeEdges = Set.insert (parent, nd) current_nonTreeEdges      } )
-                     let grandparent = Map.lookup parent parentnodes
-                     case grandparent of
-                         Just gp -> updateDirects parent gp
-                         Nothing -> error "error grandparent"
-                Nothing -> error "error "
-            pure True
-
-
-
-updateDirects :: Nd -> Nd -> MKDAILabel()
-updateDirects parent gp = do
-    current_dailabel <- gets dailabel
-    let glabel = Map.lookup gp current_dailabel
-    case glabel of 
-        Just (Labels trp ppr pps php pdir) -> modify $ \st -> st { dailabel = Map.insert gp (Labels trp ppr pps php (Set.insert parent pdir) ) current_dailabel}
-        Nothing -> error "error again "
-    parentnodes <- gets parentNodes
-    let Just ggp = Map.lookup gp parentnodes
-    if (ggp == gp) then return()
-    else updateDirects parent ggp
-
 
 
 query :: Nd -> Nd -> MKDAILabel Bool
@@ -556,7 +545,6 @@ query nd1 nd2 = do
         Nothing -> error "error again "
 
 
-
 search :: Nd -> Nd -> MKDAILabel Bool
 search nd1 nd2 = do
     current_dailabel <- gets dailabel
@@ -570,10 +558,3 @@ search nd1 nd2 = do
                 if not x 
                      then or <$> (mapM (\x -> query x nd2) (Set.toList dir1)) 
                 else return x
-
-
-deleteEdge :: Nd -> Nd -> MKDAILabel ()
-deleteEdge nd1 nd2 = undefined
-
-insertEdge :: Nd -> Nd -> MKDAILabel ()
-insertEdge nd1 nd2 = undefined
