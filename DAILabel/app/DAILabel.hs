@@ -85,25 +85,51 @@ counters = table "counter"
 counter_index :: Index (String, Int) String
 counter_index = index counters "counter_index" fst
 
+databaseTest = "test1.db"
 
 main :: IO ()
 main = do
-  db <- openDB "test1.db"
+  db <- openDB databaseTest
   x  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable counters
-    insert counters (return ( "counter", 0 ))
-    let graphmap1 = Map.fromList graph2
-    process graphmap1
+    c_counter <- getCounter
+    if (c_counter >0) then return ()
+    else
+      do      
+        insert counters (return ( "counter", 0 ))
+        let graphmap1 = Map.fromList graph2
+        process graphmap1
     select [ x | x <- from graph1Table everything ]
-  --prettyPrint x
   mapM_ (\y -> putStrLn (show y) ) x
   closeDB db
+  makeDynamicOperation databaseTest ReadWriteMode
 
---prettyPrint :: [a] -> IO ()
-prettyPrint [] = return ()
-prettyPrint [p] = putStrLn (show p)
-prettyPrint (l : ls) = putStrLn (show l) >> prettyPrint ls 
+--makeDynamicOperation :: IO()
+makeDynamicOperation test_db readwritemode = do
+    putStrLn ("Enter your choice for (I) for Edge Insertion or (D) for Edge Deletion : ")
+    choice <- getChar
+    putStrLn (" Enter the first node of the edge that you want to update : ")
+    firstChar <- getChar
+    putStrLn (" Enter the second node of the edge that you want to update : ")
+    secondChar <- getChar
+    db <- openDB test_db  
+    x <- runDaison db readwritemode $ do 
+      case choice of
+        'I' -> handleInsert (Nd firstChar) (Nd secondChar)
+        'D' -> handleDelete (Nd firstChar) (Nd secondChar)
+      select [ x | x <- from graph1Table everything ]     
+    closeDB db
+    makeDynamicOperation test_db readwritemode
+
+
+
+handleInsert :: Nd -> Nd -> Daison ()
+handleInsert nd1 nd2 = undefined
+
+handleDelete :: Nd -> Nd -> Daison ()
+handleDelete nd1 nd2 = undefined
+
 
 process :: GraphMap -> Daison ()
 process graphmap = do
