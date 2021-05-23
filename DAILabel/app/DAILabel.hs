@@ -40,6 +40,13 @@ data Labels = Labels {
     directs :: Directs
 } deriving (Typeable, Data)
 
+data Edges = Edges {
+    edges :: [(Nd,Bool)]
+} deriving (Typeable, Data)
+
+
+
+
 graph11 :: Graph
 graph11 = 
     [ (Nd 'a', [ Nd 'b', Nd 'c'] ),
@@ -69,6 +76,10 @@ instance Show Nd where
 instance Show Labels where
   show (Labels a b c d e ) = "TP: " ++  show a ++ " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e
 
+instance Show Edges where
+  show (Edges a) = show a 
+
+
 
 graph1Table :: Table (Nd,Labels)
 graph1Table = table "graph1"
@@ -76,6 +87,14 @@ graph1Table = table "graph1"
 
 graph_index :: Index (Nd, Labels) Nd
 graph_index = index graph1Table "node_index" fst
+
+
+edge1Table :: Table (Nd, Edges)
+edge1Table = table "edge1" `withIndex` edge_index
+
+edge_index :: Index (Nd, Edges) Nd
+edge_index = index edge1Table "edge_index" fst
+
 
 
 counters :: Table (String, Int)
@@ -93,19 +112,20 @@ main = do
   x  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable counters
-    c_counter <- getCounter
-    if (c_counter >0) then return ()
+    tryCreateTable edge1Table
+{-     c_counter <- getCounter
+    if (c_counter <0) then return ()
     else
-      do      
-        insert counters (return ( "counter", 0 ))
-        let graphmap1 = Map.fromList graph2
-        process graphmap1
-    select [ x | x <- from graph1Table everything ]
+      do  -}     
+    insert counters (return ( "counter", 0 ))
+    let graphmap1 = Map.fromList graph2
+    process graphmap1
+    select [ x | x <- from edge1Table everything ]
   mapM_ (\y -> putStrLn (show y) ) x
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
---makeDynamicOperation :: IO()
+makeDynamicOperation :: String -> AccessMode -> IO()
 makeDynamicOperation test_db readwritemode = do
     putStrLn ("Enter your choice for (I) for Edge Insertion or (D) for Edge Deletion : ")
     choice <- getChar
@@ -129,6 +149,14 @@ handleInsert nd1 nd2 = undefined
 
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = undefined
+
+
+isIsolated :: Nd -> Daison Bool
+isIsolated node = do
+  record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == node  ] 
+  case record of
+    [] -> return True
+    _  -> return False
 
 
 process :: GraphMap -> Daison ()
@@ -155,6 +183,7 @@ insertNodeinDB node parent = do
       c_counter <- getCounter
       incrementCounter 
       insert graph1Table (return ( node, Labels parent c_counter c_counter Set.empty Set.empty ))    
+      updateEdge1Table parent node True
       return False
     _   -> do
       parent_record <- select [(ind2, nd2, labels2) | (ind2, (nd2, labels2)) <- from graph1Table everything , nd2 == parent  ] 
@@ -163,10 +192,20 @@ insertNodeinDB node parent = do
         [(indp, ndp, labelp)] -> case labelp of 
           (Labels ptrp ppr pps php pdir) -> do
             update_ graph1Table (return (indp,(ndp, Labels ptrp ppr pps (Set.insert node php) pdir) ))
+            updateEdge1Table parent node False
             updateDirects ndp ptrp
       return True
     first : rest -> error "duplicate records in the database table, please verify"
-    
+
+updateEdge1Table :: Nd -> Nd -> Bool -> Daison ()
+updateEdge1Table nd1 nd2 isTreeEdge = do
+  record <- select [(ind, nd, edgess) | (ind, (nd, Edges edgess)) <- from edge1Table everything , nd == nd1  ] 
+  case record of
+    [] -> insert edge1Table (return ( nd1, Edges [(nd2, isTreeEdge)] ))   >> return ()
+    [(ind, nd, edges )] -> update_ edge1Table (return (ind, (nd, Edges ((nd2, isTreeEdge): edges)   )))  
+  return ()
+
+
 updatePost :: Nd -> Daison ()
 updatePost node = do 
   record <- select [(ind, nd, label) | (ind, (nd, label)) <- from graph1Table everything , nd == node  ] 
