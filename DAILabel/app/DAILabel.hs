@@ -205,6 +205,15 @@ updateEdge1Table nd1 nd2 isTreeEdge = do
     [(ind, nd, edges )] -> update_ edge1Table (return (ind, (nd, Edges ((nd2, isTreeEdge): edges)   )))  
   return ()
 
+isTreeEdge :: Nd -> Nd -> Daison Bool
+isTreeEdge nd1 nd2 = do
+  record <- select [edgess | (ind, (nd, Edges edgess)) <- from edge1Table everything , nd == nd1  ] 
+  case record of
+    [] -> return False
+    [[(nd, _)]] -> return (nd2 == nd)
+    [lis] -> return $ elem (nd2, True) lis
+
+
 
 updatePost :: Nd -> Daison ()
 updatePost node = do 
