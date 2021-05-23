@@ -96,8 +96,14 @@ main = do
     let graphmap1 = Map.fromList graph2
     process graphmap1
     select [ x | x <- from graph1Table everything ]
-  print x
+  --prettyPrint x
+  mapM_ (\y -> putStrLn (show y) ) x
   closeDB db
+
+--prettyPrint :: [a] -> IO ()
+prettyPrint [] = return ()
+prettyPrint [p] = putStrLn (show p)
+prettyPrint (l : ls) = putStrLn (show l) >> prettyPrint ls 
 
 process :: GraphMap -> Daison ()
 process graphmap = do
