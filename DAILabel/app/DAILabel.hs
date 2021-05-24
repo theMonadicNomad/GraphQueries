@@ -9,6 +9,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.List as List
 import Control.Monad
 
 
@@ -21,6 +22,7 @@ type Pre = Int
 type Post = Int
 type Graph =  [(Nd, [Nd])]
 type GraphMap = Map Nd [Nd]
+type Special = Bool
 
 
 type Distance = Int
@@ -89,11 +91,11 @@ graph_index :: Index (Nd, Labels) Nd
 graph_index = index graph1Table "node_index" fst
 
 
-edge1Table :: Table (Nd, Edges)
+edge1Table :: Table (Nd,  Edges)
 edge1Table = table "edge1" `withIndex` edge_index
 
-edge_index :: Index (Nd, Edges) Nd
-edge_index = index edge1Table "edge_index" fst
+edge_index :: Index (Nd,  Edges) Nd
+edge_index = index edge1Table "edge_index" fst--(\(a,b,c) -> a)
 
 
 
@@ -114,13 +116,17 @@ main = do
     tryCreateTable counters
     tryCreateTable edge1Table
 {-     c_counter <- getCounter
-    if (c_counter <0) then return ()
+    if (c_counter >0) then return ()
     else
       do  -}     
     insert counters (return ( "counter", 0 ))
     let graphmap1 = Map.fromList graph2
     process graphmap1
     select [ x | x <- from edge1Table everything ]
+    p <- isTheOnlyNonTreeEdge (Nd 'c') (Nd 'h')
+    return [p]
+{-     cou <- getCounter
+    return [cou] -}
   mapM_ (\y -> putStrLn (show y) ) x
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
@@ -130,15 +136,21 @@ makeDynamicOperation test_db readwritemode = do
     putStrLn ("Enter your choice for (I) for Edge Insertion or (D) for Edge Deletion : ")
     choice <- getChar
     putStrLn (" Enter the first node of the edge that you want to update : ")
-    firstChar <- getChar
+    --firstChar <- getChar
     putStrLn (" Enter the second node of the edge that you want to update : ")
-    secondChar <- getChar
+    --secondChar <- getChar
+    let firstChar = 'c'
+    let secondChar = 'h'
     db <- openDB test_db  
-    x <- runDaison db readwritemode $ do 
+    (a,b) <- runDaison db readwritemode $ do 
       case choice of
         'I' -> handleInsert (Nd firstChar) (Nd secondChar)
         'D' -> handleDelete (Nd firstChar) (Nd secondChar)
-      select [ x | x <- from graph1Table everything ]     
+      x <- select [ x | x <- from graph1Table everything ] 
+      y <- select [ x | x <- from edge1Table everything ]
+      return (x,y)
+    mapM_ (\y -> putStrLn (show y) ) a
+    mapM_ (\y -> putStrLn (show y) ) b
     closeDB db
     makeDynamicOperation test_db readwritemode
 
@@ -148,7 +160,85 @@ handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = undefined
 
 handleDelete :: Nd -> Nd -> Daison ()
-handleDelete nd1 nd2 = undefined
+handleDelete nd1 nd2 = do
+  istreeEdge <- isTreeEdge nd1 nd2
+  deleteEdge nd1 nd2 istreeEdge
+  case istreeEdge of
+    True -> do
+      deleteDirectsandAncestors nd1 nd2
+      removeTreeParent nd2
+      relabel nd2 
+    False -> do
+      flag <- isTheOnlyNonTreeEdge nd1 nd2
+      if flag then
+        do
+          record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == nd1  ] 
+          case record of
+            [(ind, nd , Labels tp pr ps hp dir)] -> do
+              deleteDirectsandAncestors tp nd1
+              if Set.null dir then return ()
+              else 
+                addDirectsandAncestors tp dir
+            _ -> error "invalid "
+      else return ()
+      deleteHopsFrom nd1 nd2
+      return ()
+
+removeTreeParent :: Nd -> Daison ()
+removeTreeParent nd1 = do 
+  record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == nd1  ] 
+  case record of
+    [(ind, nd , Labels tp pr ps hp dir)] -> do
+      update_ graph1Table (return (ind,(nd, Labels nd pr ps hp dir) ))
+
+relabel :: Nd -> Daison ()
+relabel nd1 = undefined
+
+
+deleteDirectsandAncestors :: Nd -> Nd -> Daison()
+deleteDirectsandAncestors nd1 nd2 = do
+  record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == nd1  ] 
+  case record of
+    [(ind, nd , Labels tp pr ps hp dir)] -> do
+      update_ graph1Table (return (ind,(nd, Labels tp pr ps hp (Set.delete nd2 dir)) ))
+      if tp == nd1 then return ()
+      else deleteDirectsandAncestors tp nd2
+    _ -> error "invalid"
+
+deleteHopsFrom :: Nd -> Nd -> Daison ()
+deleteHopsFrom nd1 nd2 = do
+  record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == nd1  ] 
+  case record of
+    [(ind, nd , Labels tp pr ps hp dir)] -> 
+      update_ graph1Table (return (ind,(nd, Labels tp pr ps (Set.delete nd2 hp) dir) ))
+    _ -> error "invalid"  
+
+addDirectsandAncestors :: Nd -> Directs -> Daison ()
+addDirectsandAncestors nd1 setdir = do
+  record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == nd1  ] 
+  case record of
+    [(ind, nd , Labels tp pr ps hp dir)] -> do
+      update_ graph1Table (return (ind,(nd, Labels tp pr ps hp (Set.union setdir dir)) ))
+      if tp == nd1 then return ()
+      else addDirectsandAncestors tp setdir
+    _ -> error "invalid"
+
+
+
+
+
+
+  
+
+
+
+deleteEdge :: Nd -> Nd -> Bool -> Daison()
+deleteEdge nd1 nd2 boolval = do
+  record <- select [(ind, nd, edgess) | (ind, (nd, Edges edgess)) <- from edge1Table everything , nd == nd1  ] 
+  case record of
+    [] -> error $ "database error " ++ show nd1 ++ " :  " ++ show nd2
+    [(ind, nd, edges )] -> update_ edge1Table (return (ind, (nd, Edges (List.delete (nd2, boolval) edges )   )))  
+  return ()
 
 
 isIsolated :: Nd -> Daison Bool
@@ -157,6 +247,26 @@ isIsolated node = do
   case record of
     [] -> return True
     _  -> return False
+
+isTreeEdge :: Nd -> Nd -> Daison Bool
+isTreeEdge nd1 nd2 = do
+  record <- select [edgess | (ind, (nd, Edges edgess)) <- from edge1Table everything , nd == nd1  ] 
+  case record of
+    [] -> return False
+    [[(nd, True)]] -> return (nd2 == nd)
+    [lis] -> return $ elem (nd2, True) lis
+
+
+
+isTheOnlyNonTreeEdge :: Nd -> Nd -> Daison Bool
+isTheOnlyNonTreeEdge nd1 nd2 = do
+  record <- select [edgess | (ind, (nd, Edges edgess)) <- from edge1Table everything , nd == nd1  ] 
+  case record of
+    [] -> error "database error"
+--    [[(nd, True)]] -> return (nd2 == nd)
+    [lis] -> return $ length (filter (\(x,y) -> y == False) lis ) == 0
+
+
 
 
 process :: GraphMap -> Daison ()
@@ -195,8 +305,8 @@ insertNodeinDB node parent = do
             updateEdge1Table parent node False
             updateDirects ndp ptrp
       return True
-    first : rest -> error "duplicate records in the database table, please verify"
-
+{-     first : rest -> error "duplicate records in the database table, please verify"
+ -}
 updateEdge1Table :: Nd -> Nd -> Bool -> Daison ()
 updateEdge1Table nd1 nd2 isTreeEdge = do
   record <- select [(ind, nd, edgess) | (ind, (nd, Edges edgess)) <- from edge1Table everything , nd == nd1  ] 
@@ -204,15 +314,6 @@ updateEdge1Table nd1 nd2 isTreeEdge = do
     [] -> insert edge1Table (return ( nd1, Edges [(nd2, isTreeEdge)] ))   >> return ()
     [(ind, nd, edges )] -> update_ edge1Table (return (ind, (nd, Edges ((nd2, isTreeEdge): edges)   )))  
   return ()
-
-isTreeEdge :: Nd -> Nd -> Daison Bool
-isTreeEdge nd1 nd2 = do
-  record <- select [edgess | (ind, (nd, Edges edgess)) <- from edge1Table everything , nd == nd1  ] 
-  case record of
-    [] -> return False
-    [[(nd, _)]] -> return (nd2 == nd)
-    [lis] -> return $ elem (nd2, True) lis
-
 
 
 updatePost :: Nd -> Daison ()
