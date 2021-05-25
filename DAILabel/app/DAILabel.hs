@@ -160,7 +160,21 @@ makeDynamicOperation test_db readwritemode = do
 
 
 handleInsert :: Nd -> Nd -> Daison ()
-handleInsert nd1 nd2 = undefined
+handleInsert nd1 nd2 = do
+  isolated1 <- isIsolated nd1
+  isolated2 <- isIsolated nd2
+  special1 <- isSpecial nd1
+  special2 <- isSpecial nd2
+  return ()
+  where
+    isIsolated node = do
+      record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == node  ] 
+      case record of
+        [] -> return True
+        _  -> return False
+    isSpecial node = return True 
+
+
 
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
@@ -234,13 +248,6 @@ deleteEdge nd1 nd2 boolval = do
     [(ind, nd, edges )] -> update_ edge1Table (return (ind, (nd, Edges (List.delete (nd2, boolval) edges )   )))  
   return ()
 
-
-isIsolated :: Nd -> Daison Bool
-isIsolated node = do
-  record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == node  ] 
-  case record of
-    [] -> return True
-    _  -> return False
 
 isTreeEdge :: Nd -> Nd -> Daison Bool
 isTreeEdge nd1 nd2 = do
