@@ -111,7 +111,7 @@ databaseTest = "test1.db"
 main :: IO ()
 main = do
   db <- openDB databaseTest
-  x  <- runDaison db ReadWriteMode $ do
+  (a,b)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable counters
     tryCreateTable edge1Table
@@ -122,12 +122,15 @@ main = do
     insert counters (return ( "counter", 0 ))
     let graphmap1 = Map.fromList graph2
     process graphmap1
-    select [ x | x <- from edge1Table everything ]
-    p <- isTheOnlyNonTreeEdge (Nd 'c') (Nd 'h')
+    a <- select [ x | x <- from graph1Table everything ]
+    b <- select [ x | x <- from edge1Table everything ]
+    return (a,b)
+{-     p <- isTheOnlyNonTreeEdge (Nd 'c') (Nd 'h')
     return [p]
-{-     cou <- getCounter
+ -}{-     cou <- getCounter
     return [cou] -}
-  mapM_ (\y -> putStrLn (show y) ) x
+  mapM_ (\y -> putStrLn (show y) ) a
+  mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
@@ -222,15 +225,6 @@ addDirectsandAncestors nd1 setdir = do
       if tp == nd1 then return ()
       else addDirectsandAncestors tp setdir
     _ -> error "invalid"
-
-
-
-
-
-
-  
-
-
 
 deleteEdge :: Nd -> Nd -> Bool -> Daison()
 deleteEdge nd1 nd2 boolval = do
