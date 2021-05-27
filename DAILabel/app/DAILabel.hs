@@ -12,8 +12,7 @@ import qualified Data.Map as Map
 import qualified Data.List as List
 import Control.Monad
 import Control.Monad.IO.Class
-{- import GHC.IntWord64
- -}
+
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
 type Ndc = Char
@@ -44,15 +43,10 @@ data Labels = Labels {
     directs :: Directs
 } deriving (Typeable, Data )
 
-{- data Edges = Edges {
-    edges :: [(Nd,Bool)]
-} deriving (Typeable, Data)
- 
-data X = X { named :: Nd, 
- indexValue :: GHC.Int64 } deriving (Typeable, Data)
+data X = X { ndc :: Ndc, 
+     keyLabels :: Key Labels
+} deriving (Typeable, Data, Show)
 
-node_table :: Table X
--}
 
 graph11 :: Graph
 graph11 = 
@@ -75,18 +69,8 @@ graph2 =
       ( 'k', [] )
     ]
 
-
-
-{- instance Show Nd where
-  show (Nd a) = show a  -}
-
 instance Show Labels where
   show (Labels a b c d e ) = "TP: " ++  show a ++ " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e
-
-{- instance Show Edges where
-  show (Edges a) = show a  -}
-
-
 
 graph1Table :: Table (Labels)
 graph1Table = table "graph1"
@@ -95,13 +79,11 @@ graph1Table = table "graph1"
 graph_index :: Index Labels Labels 
 graph_index = index graph1Table "node_index" Prelude.id
 
-data X = X { ndc :: Ndc, keyLabels :: Key Labels} deriving (Typeable, Data, Show)
-
 nodeMapTable :: Table X
 nodeMapTable = table "nodemap" `withIndex` nodemap_index
 
 nodemap_index :: Index X Ndc
-nodemap_index = index nodeMapTable "nodemap_index" ndc --(\(a,b,c) -> a)
+nodemap_index = index nodeMapTable "nodemap_index" ndc 
 
 counters :: Table (String, Int)
 counters = table "counter" 
@@ -129,10 +111,6 @@ main = do
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
     return (a,b)
-{-     p <- isTheOnlyNonTreeEdge (Nd 'c') (Nd 'h')
-    return [p]
- -}{-     cou <- getCounter
-    return [cou] -}
   mapM_ (\y -> putStrLn (show y) ) a
   mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
@@ -212,15 +190,12 @@ insertNodeinDB :: Ndc -> Ndc -> Daison Bool
 insertNodeinDB node parent = do
   map <- select [nodeindex | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
   par <- if (node == parent) then return [0] else select [nodeindex | (ind, ( X nd  nodeindex )) <- from nodeMapTable everything , nd == parent  ]
-
---  record <- select [(ind, nd, labels) | (ind, (nd, labels)) <- from graph1Table everything , nd == node  ] 
   case map of
     [] -> do
       c_counter <- getCounter
       incrementCounter
       pkey <- insert_ graph1Table ((Labels (head par) c_counter c_counter Set.empty Set.empty ))    
       insert_ nodeMapTable (X node pkey)
-      --updateEdge1Table parent node True
       return False
     _   ->  do
       parent_record <- select [(head par, labels2) | (labels2) <- from graph1Table (at (head par))  ] 
@@ -229,19 +204,10 @@ insertNodeinDB node parent = do
         [(indp, labelp)] -> case labelp of 
           (Labels ptrp ppr pps php pdir) -> do
             update_ graph1Table (return (indp,(Labels ptrp ppr pps (Set.insert (head map) php) pdir) ))
-            --updateEdge1Table parent node False
             --when (ptrp /= 0)
             updateDirects (head par) ptrp 
       return True 
 {-     first : rest -> error "duplicate records in the database table, please verify"
- -}
-{- updateEdge1Table :: Nd -> Nd -> Bool -> Daison ()
-updateEdge1Table nd1 nd2 isTreeEdge = do
-  record <- select [(ind, nd, edgess) | (ind, (nd, Edges edgess)) <- from edge1Table everything , nd == nd1  ] 
-  case record of
-    [] -> insert edge1Table (return ( nd1, Edges [(nd2, isTreeEdge)] ))   >> return ()
-    [(ind, nd, edges )] -> update_ edge1Table (return (ind, (nd, Edges ((nd2, isTreeEdge): edges)   )))  
-  return ()
  -}
 
 updatePost :: Nd -> Daison ()
@@ -289,9 +255,5 @@ incrementCounter = getCounter >>= \c_counter -> update_ counters (return (1, ("c
 
 resetCounter :: Daison ()
 resetCounter = update_ counters (return (1, ("counter", 0) ))
-
--- select need to do two lookups. (one is to get the keyId, second one the real lookup)
-
--- another solutions could be, in the directs itself, you store the keyid rather than the name of the node.
 
 
