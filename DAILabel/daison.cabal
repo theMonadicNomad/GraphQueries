@@ -44,4 +44,5 @@ executable daison-exe
       base
     , containers
     , daison
+    , ghc-prim
   default-language: Haskell2010

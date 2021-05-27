@@ -37,3 +37,4 @@ executables:
     dependencies:
       - daison
       - containers
+      - ghc-prim
