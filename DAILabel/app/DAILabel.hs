@@ -197,7 +197,7 @@ handleInsert nd1 nd2 = do
           case record1 of
             [(Labels tp pr ps hp dir te)] -> update_ graph1Table (return (nd1, Labels 0 c_counter (c_counter+3) (Set.insert nd2 hp) dir (nd2:te)) ) 
           case record2 of
-            [(Labels tp pr ps hp dir te)] -> update_ graph1Table (return (nd2, Labels nd1 (c_counter+1) (c_counter+2) (Set.insert nd2 hp) dir te) ) 
+            [(Labels tp pr ps hp dir te)] -> update_ graph1Table (return (nd2, Labels nd1 (c_counter+1) (c_counter+2) hp dir te) ) 
  
   return ()
   where
@@ -280,12 +280,25 @@ removeTreeParent nd1 = do
     
 
 relabel :: Nd -> [Nd] -> Daison [Nd]
-relabel nd visited = undefined {- do 
+relabel nd visited =  do 
   x <- updatePre nd visited
   if x then return visited
-       else do -}
+       else do
+         edges <- getEdges nd 
+         nv <- case edges of
+           [] -> return visited
+           rest -> foldM (\acc y -> relabel y acc) visited  rest
+         updatePost nd 
+         return (nd : nv)
 
 
+getEdges :: Nd -> Daison [Nd]
+getEdges nd = do 
+  record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
+  case record of
+    [(nd , Labels tp pr ps hp dir te)] -> if (List.null te) then return $ Set.toList hp
+                                          else 
+                                            return $ te ++ (Set.toList hp)
 
 deleteDirectsandAncestors :: Nd -> Nd -> Daison()
 deleteDirectsandAncestors nd1 nd2 = do
