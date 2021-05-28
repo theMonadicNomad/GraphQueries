@@ -186,7 +186,15 @@ handleInsert nd1 nd2 = do
               case record of --how the new node is inserted
                 [(Labels tp pr ps hp dir te)] -> update_ graph1Table (return (nd1, Labels tp c_counter (c_counter+1) (Set.insert nd2 hp) dir te) )   
           else
-            return() --how to reach case1 
+            do               
+              if (not special2)
+                then getDirects nd2 >>= \dir2 -> addDirectsandAncestors nd1 dir2 -- and the informatio of (u,v)
+                                                                                -- stored in the intervals 
+              else
+                addDirectinAncestors nd1 nd2
+              setTreeParent nd2 nd1
+              resetCounter 
+              relabel nd1 [] >> return ()  --is it valid  case1 
       else 
         do 
           addEdge nd1 nd2 
@@ -227,10 +235,6 @@ addEdge nd1 nd2 = do
   case record of
     [(nd , Labels tp pr ps hp dir te)] -> do
       update_ graph1Table (return (nd, Labels tp pr ps hp dir (nd2:te)) )
-
-
-
-
 
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
@@ -436,10 +440,6 @@ updatePre nd visited = do
                                                update_ graph1Table (return (nd, Labels trp c_counter c_counter hp dir te ))
                                                return False
     _ -> error "error " 
-
-
-
-
 
 updatePost :: Nd -> Daison ()
 updatePost nd = do 
