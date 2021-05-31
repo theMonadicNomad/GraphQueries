@@ -12,6 +12,8 @@ import qualified Data.Map as Map
 import qualified Data.List as List
 import Control.Monad
 import Control.Monad.IO.Class
+import qualified System.IO as IO
+
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -120,14 +122,15 @@ main = do
 
 makeDynamicOperation :: String -> AccessMode -> IO()
 makeDynamicOperation test_db readwritemode = do
+    IO.hSetBuffering IO.stdin IO.NoBuffering
     putStrLn ("Enter your choice for (I) for Edge Insertion or (D) for Edge Deletion : ")
     choice <- getChar
     putStrLn (" Enter the first node of the edge that you want to update : ")
---    firstChar <- getChar
+    firstChar <- getChar
     putStrLn (" Enter the second node of the edge that you want to update : ")
---    secondChar <- getChar
-    let firstChar = 'k'
-    let secondChar = 'l'
+    secondChar <- getChar
+--    let firstChar = 'k'
+--    let secondChar = 'l'
     db <- openDB test_db  
     (a,b) <- runDaison db readwritemode $ do 
       nd1 <- getNdIndex firstChar
