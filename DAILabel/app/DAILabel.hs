@@ -27,6 +27,7 @@ type Graph =  [(Ndc, [Ndc])]
 type GraphMap = Map Ndc [Ndc]
 type Special = Bool
 type TreeEdges =  [Nd]
+type Record = (Nd, Labels)
 
 
 type Distance = Int
@@ -48,7 +49,8 @@ data Labels = Labels {
 } deriving (Typeable, Data )
 
 data X = X { ndc :: Ndc, 
-     keyLabels :: Key Labels
+     keyLabels :: Key Labels--,
+--     edges 
 } deriving (Typeable, Data, Show)
 
 
@@ -149,11 +151,13 @@ makeDynamicOperation test_db readwritemode = do
 
 handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
-  isolated1 <- isIsolated nd1
-  isolated2 <- isIsolated nd2
-  special1 <- isSpecialNode nd1
-  special2 <- isSpecialNode nd2
-  hasparent2 <- hasParent nd2
+  record1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
+  record2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+  let isolated1  = isIsolated record1
+  let isolated2 = isIsolated record2
+  let special1 = isSpecialNode record1
+  let special2 = isSpecialNode record2
+  let hasparent2 = hasParent record2
   if (not isolated1) 
     then do
       if (not isolated2)
@@ -161,7 +165,7 @@ handleInsert nd1 nd2 = do
           if (not hasparent2)
             then do 
               if (not special2)
-                then getDirects nd2 >>= \dir2 -> addDirectsandAncestors nd1 dir2 -- and the informatio of (u,v)
+                then getDirects record2 >>= \dir2 -> addDirectsandAncestors nd1 dir2 -- and the informatio of (u,v)
                                                                                 -- stored in the intervals 
               else
                 addDirectinAncestors nd1 nd2
@@ -190,14 +194,14 @@ handleInsert nd1 nd2 = do
               c_counter <- getCounter
               incrementCounter
               incrementCounter
-              record <- select [(labels) | (labels) <- from graph1Table (at nd1)  ]
-              case record of --how the new node is inserted
+--              record <- select [(labels) | (labels) <- from graph1Table (at nd1)  ]
+              case record1 of --how the new node is inserted
                 [(Labels tp pr ps hp dir te)] -> update_ graph1Table (return (nd1, Labels tp c_counter (c_counter+1) (Set.insert nd2 hp) dir te) )   
               liftIO $ print ( " from Case3 -- HasParent2 Insert")
           else
             do               
               if (not special2)
-                then getDirects nd2 >>= \dir2 -> addDirectsandAncestors nd1 dir2 -- and the informatio of (u,v)
+                then getDirects record2 >>= \dir2 -> addDirectsandAncestors nd1 dir2 -- and the informatio of (u,v)
                                                                                 -- stored in the intervals 
               else
                 addDirectinAncestors nd1 nd2
@@ -208,8 +212,8 @@ handleInsert nd1 nd2 = do
       else 
         do 
 --          addEdge nd1 nd2 
-          record1 <- select [(labels) | (labels) <- from graph1Table (at nd1)  ]
-          record2 <- select [(labels) | (labels) <- from graph1Table (at nd2)  ]
+--          record1 <- select [(labels) | (labels) <- from graph1Table (at nd1)  ]
+--          record2 <- select [(labels) | (labels) <- from graph1Table (at nd2)  ]
           c_counter <- getCounter
           incrementCounter >> incrementCounter >> incrementCounter >> incrementCounter
           case record1 of
@@ -220,24 +224,22 @@ handleInsert nd1 nd2 = do
  
   return ()
   where
-    hasParent node = do
-      record <- select [(labels) | (labels) <- from graph1Table (at node)  ] 
-      case record of
-        [(Labels tp pr ps hp dir te)] -> return $ tp > 0
+    hasParent record = case record of
+        [(Labels tp pr ps hp dir te)] ->  tp > 0
 --        _  -> return False
-    isIsolated node = do
-      record <- select [labels | (labels) <- from graph1Table (at node)  ] 
-      case record of
-        [(Labels tp _ _ _ _ _ )] -> return $ tp == -1
-        _  -> return False
-    getDirects node = do 
-      record <- select [(labels) | (labels) <- from graph1Table (at node)  ] 
-      case record of
+    isIsolated record = case record of
+        [(Labels tp _ _ _ _ _ )] -> tp == -1
+        _  ->  False
+    getDirects record = case record of
         [(Labels tp pr ps hp dir te)] -> return dir
     setTreeParent nd1 nd2 = do
       record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
       case record of
         [(nd, Labels tp pr ps hp dir te)] ->  update_ graph1Table (return (nd, Labels nd2 pr ps hp dir te) )   
+    isSpecialNode record = case record of 
+      [(Labels tp pr ps hp dir _)] ->  (Set.size hp) > 0
+      _       -> error "error from special node record : "
+
 
 
 addEdge :: Nd -> Nd -> Daison()
@@ -364,12 +366,6 @@ isTreeEdge nd1 nd2 = do
     [(Labels tp pr ps hp dir te)] -> return $ List.elem nd2 te 
     _ -> error $ " from istreeedge : " ++ show nd1 ++ show nd2
  
-isSpecialNode :: Nd -> Daison Bool
-isSpecialNode nd = do 
-  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
-  case record of 
-    [(Labels tp pr ps hp dir _)] -> return $ (Set.size hp) > 0
-    _       -> error "error from special node record : "
 
 isTheOnlyNonTreeEdge :: Nd -> Nd -> Daison Bool
 isTheOnlyNonTreeEdge nd1 nd2 = do
