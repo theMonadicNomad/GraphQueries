@@ -26,7 +26,7 @@ type Post = Int
 type Graph =  [(Ndc, [Ndc])]
 type GraphMap = Map Ndc [Ndc]
 type Special = Bool
-type TreeEdges =  [Nd]
+--type TreeEdges =  [Nd]
 type Record = (Nd, Labels)
 type Edges = [Nd]
 
@@ -45,8 +45,8 @@ data Labels = Labels {
     pre :: Pre,
     post :: Post,
     hops :: Hops,
-    directs :: Directs,
-    treeedges ::TreeEdges
+    directs :: Directs--,
+--    treeedges ::TreeEdges
 } deriving (Typeable, Data )
 
 data X = X { ndc :: Ndc, 
@@ -77,7 +77,7 @@ graph2 =
     ]
 
 instance Show Labels where
-  show (Labels a b c d e f) = "TP: " ++  show a ++ " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e ++ " Tree Edges : " ++ show f 
+  show (Labels a b c d e) = "TP: " ++  show a ++ " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e 
 
 graph1Table :: Table (Labels)
 graph1Table = table "graph1"
@@ -197,7 +197,7 @@ handleInsert nd1 nd2 = do
               incrementCounter
 --              record <- select [(labels) | (labels) <- from graph1Table (at nd1)  ]
               case record1 of --how the new node is inserted
-                [(Labels tp pr ps hp dir te)] -> update_ graph1Table (return (nd1, Labels tp c_counter (c_counter+1) (Set.insert nd2 hp) dir te) )   
+                [(Labels tp pr ps hp dir)] -> update_ graph1Table (return (nd1, Labels tp c_counter (c_counter+1) (Set.insert nd2 hp) dir) )   
               liftIO $ print ( " from Case3 -- HasParent2 Insert")
           else
             do               
@@ -212,43 +212,43 @@ handleInsert nd1 nd2 = do
               relabel nd1 [] >> return ()   --is it valid  case1 
       else 
         do 
---          addEdge nd1 nd2 
+          addEdge nd1 nd2 
 --          record1 <- select [(labels) | (labels) <- from graph1Table (at nd1)  ]
 --          record2 <- select [(labels) | (labels) <- from graph1Table (at nd2)  ]
           c_counter <- getCounter
           incrementCounter >> incrementCounter >> incrementCounter >> incrementCounter
           case record1 of
-            [(Labels tp pr ps hp dir te)] -> update_ graph1Table (return (nd1, Labels 0 c_counter (c_counter+3) hp dir (nd2:te)) ) 
+            [(Labels tp pr ps hp dir)] -> update_ graph1Table (return (nd1, Labels 0 c_counter (c_counter+3) hp dir ) ) 
           case record2 of
-            [(Labels tp pr ps hp dir te)] -> update_ graph1Table (return (nd2, Labels nd1 (c_counter+1) (c_counter+2) hp dir te) ) 
+            [(Labels tp pr ps hp dir)] -> update_ graph1Table (return (nd2, Labels nd1 (c_counter+1) (c_counter+2) hp dir) ) 
           liftIO $ print ( " from Case4 Insert")
  
   return ()
   where
     hasParent record = case record of
-        [(Labels tp pr ps hp dir te)] ->  tp > 0
+        [(Labels tp pr ps hp dir )] ->  tp > 0
 --        _  -> return False
     isIsolated record = case record of
-        [(Labels tp _ _ _ _ _ )] -> tp == -1
+        [(Labels tp _ _ _ _  )] -> tp == -1
         _  ->  False
     getDirects record = case record of
-        [(Labels tp pr ps hp dir te)] -> return dir
+        [(Labels tp pr ps hp dir)] -> return dir
     setTreeParent nd1 nd2 = do
       record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
       case record of
-        [(nd, Labels tp pr ps hp dir te)] ->  update_ graph1Table (return (nd, Labels nd2 pr ps hp dir te) )   
+        [(nd, Labels tp pr ps hp dir )] ->  update_ graph1Table (return (nd, Labels nd2 pr ps hp dir ) )   
     isSpecialNode record = case record of 
-      [(Labels tp pr ps hp dir _)] ->  (Set.size hp) > 0
+      [(Labels tp pr ps hp dir)] ->  (Set.size hp) > 0
       _       -> error "error from special node record : "
 
 
 
 addEdge :: Nd -> Nd -> Daison()
 addEdge nd1 nd2 = do 
-  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
+  record <- select [(n, edgs) | (X n edgs) <- from nodeMapTable (at nd1)  ] 
   case record of
-    [(nd , Labels tp pr ps hp dir te)] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps hp dir (nd2:te)) )
+    [(n, edgs)] -> do
+      update_ nodeMapTable (return (nd1, X n (nd2: edgs)) )
 
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
@@ -265,7 +265,7 @@ handleDelete nd1 nd2 = do
         do
           record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
           case record of
-            [(nd , Labels tp pr ps hp dir te)] -> do
+            [(nd , Labels tp pr ps hp dir)] -> do
               deleteDirectsandAncestors tp nd1
               when ( not $ Set.null dir ) $ addDirectsandAncestors tp dir
             _ -> error $ "invalid from handle delete : " ++ show nd1 ++ show nd2
@@ -277,24 +277,28 @@ addHop :: Nd -> Nd -> Daison ()
 addHop nd1 nd2 = do 
   record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
   case record of
-    [(nd , Labels tp pr ps hp dir te)] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps (Set.insert nd2 hp) dir te) )
+    [(nd , Labels tp pr ps hp dir)] -> do
+      update_ graph1Table (return (nd, Labels tp pr ps (Set.insert nd2 hp) dir) )
 
 
 deleteTreeEdge :: Nd -> Nd -> Daison ()
 deleteTreeEdge nd1 nd2 = do 
-  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
-  case record of
-    [(nd , Labels tp pr ps hp dir te)] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps hp dir (List.delete nd2 te)) )
+  istreeedge <- isTreeEdge nd1 nd2
+  if istreeedge then
+    do 
+      record <- select [(n, edgs) | (X n edgs) <- from nodeMapTable (at nd1)  ] 
+      case record of
+        [(n , edgs)] -> update_ nodeMapTable (return (nd1, X n (List.delete nd2 edgs)) )
+  else 
+    error $ show nd1 ++ " -  " ++ show nd2 ++ " is not a tree edge"
 
 
 removeTreeParent :: Nd -> Daison ()
 removeTreeParent nd1 = do 
   record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
   case record of
-    [(nd , Labels tp pr ps hp dir te)] -> do
-      update_ graph1Table (return (nd, Labels 0 pr ps hp dir te) )
+    [(nd , Labels tp pr ps hp dir)] -> do
+      update_ graph1Table (return (nd, Labels 0 pr ps hp dir) )
     
 
 relabel :: Nd -> [Nd] -> Daison [Nd]
@@ -314,18 +318,19 @@ relabel nd visited =  do
 
 getEdges :: Nd -> Daison [Nd]
 getEdges nd = do 
-  record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
-  case record of
+  record <- select [ edgs| ( X n edgs) <- from nodeMapTable (at nd)  ] 
+  return . head $ record
+  {- case record of
     [(nd , Labels tp pr ps hp dir te)] -> if (List.null te) then return $ Set.toList hp
                                           else 
-                                            return $ te ++ (Set.toList hp)
+                                            return $ te ++ (Set.toList hp) -}
 
 deleteDirectsandAncestors :: Nd -> Nd -> Daison()
 deleteDirectsandAncestors nd1 nd2 = do
   record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
   case record of
-    [(nd , Labels tp pr ps hp dir te)] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps hp (Set.delete nd2 dir) te) )
+    [(nd , Labels tp pr ps hp dir)] -> do
+      update_ graph1Table (return (nd, Labels tp pr ps hp (Set.delete nd2 dir) ) )
       when (tp/=0) $ deleteDirectsandAncestors tp nd2
     _ -> error $ "invalid from deletedirectss and ancestors " ++ show nd1 ++ show nd2
 
@@ -334,8 +339,8 @@ deleteHopsFrom :: Nd -> Nd -> Daison ()
 deleteHopsFrom nd1 nd2 = do
   record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
   case record of
-    [(nd , Labels tp pr ps hp dir te)] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps (Set.delete nd2 hp) dir te) )
+    [(nd , Labels tp pr ps hp dir)] -> do
+      update_ graph1Table (return (nd, Labels tp pr ps (Set.delete nd2 hp) dir) )
     _ -> error "invalid"  
 
 
@@ -343,8 +348,8 @@ addDirectinAncestors :: Nd -> Nd -> Daison ()
 addDirectinAncestors anc d = do
   record <- select [(anc, labels) | (labels) <- from graph1Table (at anc)  ] 
   case record of
-    [(nd , Labels tp pr ps hp dir te)] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps hp (Set.insert d dir) te) )
+    [(nd , Labels tp pr ps hp dir)] -> do
+      update_ graph1Table (return (nd, Labels tp pr ps hp (Set.insert d dir) ) )
       when (tp/=0) $ addDirectinAncestors tp d
     _ -> error "invalid"
 
@@ -355,8 +360,8 @@ addDirectsandAncestors :: Nd -> Directs -> Daison ()
 addDirectsandAncestors nd1 setdir = do
   record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
   case record of
-    [(nd , Labels tp pr ps hp dir te)] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps hp (Set.union setdir dir) te) )
+    [(nd , Labels tp pr ps hp dir)] -> do
+      update_ graph1Table (return (nd, Labels tp pr ps hp (Set.union setdir dir)) )
       when (tp/=0) $ addDirectsandAncestors tp setdir
     _ -> error "invalid"
 
@@ -364,7 +369,15 @@ isTreeEdge :: Nd -> Nd -> Daison Bool
 isTreeEdge nd1 nd2 = do
   record <- select [label1 | (label1) <- from graph1Table (at nd1)  ] 
   case record of 
-    [(Labels tp pr ps hp dir te)] -> return $ List.elem nd2 te 
+    [(Labels tp pr ps hp dir)] -> case (List.elem nd2 hp) of
+      True -> return False
+      False -> do 
+        nodemap_record <- select [edgs | ( X n edgs) <- from nodeMapTable (at nd1)  ]
+        let nd_edges = head nodemap_record
+        if (List.elem nd2 nd_edges) then 
+          return True
+        else 
+          return False
     _ -> error $ " from istreeedge : " ++ show nd1 ++ show nd2
  
 
@@ -373,7 +386,7 @@ isTheOnlyNonTreeEdge nd1 nd2 = do
   record <- select [(nd1,label1) | (label1) <- from graph1Table (at nd1)  ] 
   case record of 
     [(nd, label)] -> case label of
-      Labels trp pr ps hp dir _ ->  do 
+      Labels trp pr ps hp dir ->  do 
         if (Set.member nd2 hp) && (Set.size hp ==1) then 
           return True
         else if (Set.member nd2 hp) && (Set.size hp > 1) then
@@ -406,35 +419,42 @@ getNdIndex node = do
       c_counter <- getCounter
       incrementCounter >> incrementCounter
       pkey <- insert_ nodeMapTable (X node [])
-      store  graph1Table (Just pkey) (Labels (-1) c_counter (c_counter+1) Set.empty Set.empty []  )
-      
+      store  graph1Table (Just pkey) (Labels (-1) c_counter (c_counter+1) Set.empty Set.empty  )
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
 insertNodeinDB :: Ndc -> Ndc -> Daison Bool
 insertNodeinDB node parent = do
-  map <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
-  par <- if (node == parent) then return [0] else select [ind | (ind, ( X nd  nodeindex )) <- from nodeMapTable everything , nd == parent  ]
+  map <- select [ind | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == node  ]
+  par <- if (node == parent) then return [(0,('a',[]))] else select [(ind,(nd, edgess)) | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == parent  ]
+  let parent_ndmp = fst . head $ par
+  let edges_par = snd . snd . head $ par 
+  let parent_ndc = fst . snd . head $ par
   case map of
     [] -> do
       c_counter <- getCounter
       incrementCounter
       pkey <-  insert_ nodeMapTable (X node [])
-      store graph1Table (Just pkey) (Labels (head par) c_counter c_counter Set.empty Set.empty []  )    
+      store graph1Table (Just pkey) (Labels parent_ndmp c_counter c_counter Set.empty Set.empty )    
       
-      when (head par /= 0) $ do
-        parent_record <- select [(head par, labels2) | (labels2) <- from graph1Table (at (head par))  ] 
-        case parent_record of
-          [(indp ,(Labels ptrp ppr pps php pdir pte))] -> update_ graph1Table (return (indp,(Labels ptrp ppr pps php pdir (pkey:pte)) ))
+      when (parent_ndmp > 0) $ do
+--        parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
+--        case parent_record of
+--          [(indp ,(Labels ptrp ppr pps php pdir pte))] -> update_ graph1Table (return (indp,(Labels ptrp ppr pps php pdir (pkey:pte)) ))
+--        parent_ndmprecord <- select [(ind,edgess) | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == parent  ]
+        update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (pkey:edges_par) ) ))
+
       return False
-    _   ->  do
-      parent_record <- select [(head par, labels2) | (labels2) <- from graph1Table (at (head par))  ] 
+    [nod]   ->  do
+      parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
       case parent_record of 
           [] -> error "error "
           [(indp, labelp)] -> case labelp of 
-            (Labels ptrp ppr pps php pdir pte) -> do
-              update_ graph1Table (return (indp,(Labels ptrp ppr pps (Set.insert (head map) php ) pdir pte) ))
-              when (ptrp /= 0) $ updateDirects (head par) ptrp 
+            (Labels ptrp ppr pps php pdir) -> do
+              update_ graph1Table (return (indp,(Labels ptrp ppr pps (Set.insert (head map) php ) pdir) ))
+              when (ptrp > 0) $ updateDirects parent_ndmp ptrp 
+      update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (nod:edges_par) ) ))
+
       return True 
 {-     first : rest -> error "duplicate records in the database table, please verify"
  -}
@@ -444,12 +464,12 @@ updatePre :: Nd -> [Nd] -> Daison Bool
 updatePre nd visited = do 
   record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
   case record of 
-    [(nd, Labels trp pr ps hp dir te )] -> if pr == ps || elem nd visited then return True
+    [(nd, Labels trp pr ps hp dir  )] -> if pr == ps || elem nd visited then return True
                                            else   
                                              do
                                                c_counter <- getCounter
                                                incrementCounter
-                                               update_ graph1Table (return (nd, Labels trp c_counter c_counter hp dir te ))
+                                               update_ graph1Table (return (nd, Labels trp c_counter c_counter hp dir ))
                                                return False
     _ -> error "error " 
 
@@ -458,10 +478,10 @@ updatePost nd = do
   record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
   case record of 
     [(nd, label)] -> case label of
-      Labels trp pr ps hp dir te ->  do 
+      Labels trp pr ps hp dir  ->  do 
         c_counter <- getCounter
         incrementCounter
-        update_ graph1Table (return (nd, Labels trp pr c_counter hp dir te ))
+        update_ graph1Table (return (nd, Labels trp pr c_counter hp dir ))
       _   -> error "error from updatepost"
     _ -> error "error " 
 
@@ -470,8 +490,8 @@ updateDirects parent gp = do
   record <- select [(gp,label1) | (label1) <- from graph1Table (at gp)  ] 
   case record of 
     [(nd, label)] -> case label of
-      Labels trp pr ps hp dir te ->  do
-        update_ graph1Table (return (nd, Labels trp pr ps hp (Set.insert parent dir) te ))
+      Labels trp pr ps hp dir ->  do
+        update_ graph1Table (return (nd, Labels trp pr ps hp (Set.insert parent dir) ))
       _ -> error "updatedirects error"
     _   -> liftIO $ print record
   when (gp /= 0) $ do
@@ -484,7 +504,7 @@ getParent node = do
   case record of
     [] -> error $ "invalid parent node :" ++ show node
     [(ind1,  label1)] -> case label1 of 
-      (Labels trp _ _ _ _ _) -> return trp
+      (Labels trp _ _ _ _ ) -> return trp
     _           -> error "multiple parents error "
  
 getCounter :: Daison Int
