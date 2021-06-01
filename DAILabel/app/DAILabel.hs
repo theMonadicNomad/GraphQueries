@@ -28,6 +28,7 @@ type GraphMap = Map Ndc [Ndc]
 type Special = Bool
 type TreeEdges =  [Nd]
 type Record = (Nd, Labels)
+type Edges = [Nd]
 
 
 type Distance = Int
@@ -49,7 +50,7 @@ data Labels = Labels {
 } deriving (Typeable, Data )
 
 data X = X { ndc :: Ndc, 
-     keyLabels :: Key Labels--,
+     edges :: Edges--,
 --     edges 
 } deriving (Typeable, Data, Show)
 
@@ -398,27 +399,29 @@ processNodes graph nd parent = do
     getNdIndex nd >>= \nd1 -> updatePost nd1
 
 getNdIndex node = do
-  nod <- select [nodeindex | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
+  nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
   case nod of
     [nd] -> return nd
     []   -> do 
       c_counter <- getCounter
       incrementCounter >> incrementCounter
-      pkey <- insert_ graph1Table ((Labels (-1) c_counter (c_counter+1) Set.empty Set.empty []  ))    
-      insert_ nodeMapTable (X node pkey)
+      pkey <- insert_ nodeMapTable (X node [])
+      store  graph1Table (Just pkey) (Labels (-1) c_counter (c_counter+1) Set.empty Set.empty []  )
+      
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
 insertNodeinDB :: Ndc -> Ndc -> Daison Bool
 insertNodeinDB node parent = do
-  map <- select [nodeindex | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
-  par <- if (node == parent) then return [0] else select [nodeindex | (ind, ( X nd  nodeindex )) <- from nodeMapTable everything , nd == parent  ]
+  map <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
+  par <- if (node == parent) then return [0] else select [ind | (ind, ( X nd  nodeindex )) <- from nodeMapTable everything , nd == parent  ]
   case map of
     [] -> do
       c_counter <- getCounter
       incrementCounter
-      pkey <- insert_ graph1Table ((Labels (head par) c_counter c_counter Set.empty Set.empty []  ))    
-      insert_ nodeMapTable (X node pkey)
+      pkey <-  insert_ nodeMapTable (X node [])
+      store graph1Table (Just pkey) (Labels (head par) c_counter c_counter Set.empty Set.empty []  )    
+      
       when (head par /= 0) $ do
         parent_record <- select [(head par, labels2) | (labels2) <- from graph1Table (at (head par))  ] 
         case parent_record of
