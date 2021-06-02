@@ -123,11 +123,11 @@ main = do
 makeDynamicOperation :: String -> AccessMode -> IO()
 makeDynamicOperation test_db readwritemode = do
     IO.hSetBuffering IO.stdin IO.NoBuffering
-    putStrLn ("Enter your choice for (i) for Edge Insertion or (d) for Edge Deletion : ")
+    putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion : ")
     choice <- getChar
-    putStrLn (" Enter the first node of the edge that you want to update : ")
+    putStrLn (" Enter the first node : ")
     firstChar <- getChar
-    putStrLn (" Enter the second node of the edge that you want to update : ")
+    putStrLn (" Enter the second node : ")
     secondChar <- getChar
 --    let firstChar = 'k'
 --    let secondChar = 'l'
@@ -138,6 +138,9 @@ makeDynamicOperation test_db readwritemode = do
       case choice of
         'i' -> handleInsert nd1 nd2
         'd' -> handleDelete nd1 nd2 
+        's' -> do 
+          flag <- search nd1 nd2
+          liftIO $ print  $ " search result : " ++ show flag
       x <- select [ x | x <- from graph1Table everything ] 
       y <- select [ x | x <- from nodeMapTable everything ]
       return (x,y)
@@ -516,5 +519,33 @@ incrementCounter = do
 
 resetCounter :: Daison ()
 resetCounter = update_ counters (return (1, ("counter", 0) ))
+
+
+queryM :: Nd -> Nd -> Daison Bool
+queryM nd1 nd2 = do
+  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
+  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+  case label1 of 
+    [(Labels trp1 pre1 post1 hp1 dir1)] -> do
+      case label2 of
+        [(Labels trp2 pre2 post2 hp2 dir2)] -> if  (pre1 < post2 && post2 <= post1) then return True
+                                             else return False
+        _ -> error "error "                
+    _ -> error "error again "
+
+
+search :: Nd -> Nd -> Daison Bool
+search nd1 nd2 = do
+  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
+  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+  case label1 of 
+    [(Labels trp1 pre1 post1 hp1 dir1)] -> do
+      flag <- queryM nd1 nd2
+      if flag then return True
+      else do
+        x <- or <$> (mapM (\x -> queryM x nd2) (Set.toList hp1)) 
+        if not x 
+          then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
+        else return x
 
 
