@@ -139,7 +139,7 @@ makeDynamicOperation test_db readwritemode = do
         'i' -> handleInsert nd1 nd2
         'd' -> handleDelete nd1 nd2 
         's' -> do 
-          flag <- search nd1 nd2
+          flag <- dfsearch nd1 nd2
           liftIO $ print  $ " search result : " ++ show flag
       x <- select [ x | x <- from graph1Table everything ] 
       y <- select [ x | x <- from nodeMapTable everything ]
@@ -548,4 +548,11 @@ search nd1 nd2 = do
           then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
         else return x
 
+dfsearch :: Nd -> Nd -> Daison Bool
+dfsearch nd1 nd2 = do 
+  record <- select [edgs | (X n edgs) <- from nodeMapTable (at nd1)  ] 
+  case (head record) of
+    lis@(first : rest) -> case (List.elem nd2 lis) of
+      True -> return True
+      False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
 
