@@ -26,7 +26,6 @@ type Post = Int
 type Graph =  [(Ndc, [Ndc])]
 type GraphMap = Map Ndc [Ndc]
 type Special = Bool
---type TreeEdges =  [Nd]
 type Record = (Nd, Labels)
 type Edges = [Nd]
 
@@ -45,13 +44,11 @@ data Labels = Labels {
     pre :: Pre,
     post :: Post,
     hops :: Hops,
-    directs :: Directs--,
---    treeedges ::TreeEdges
+    directs :: Directs
 } deriving (Typeable, Data )
 
 data X = X { ndc :: Ndc, 
-     edges :: Edges--,
---     edges 
+     edges :: Edges
 } deriving (Typeable, Data, Show)
 
 
@@ -126,7 +123,7 @@ main = do
 makeDynamicOperation :: String -> AccessMode -> IO()
 makeDynamicOperation test_db readwritemode = do
     IO.hSetBuffering IO.stdin IO.NoBuffering
-    putStrLn ("Enter your choice for (I) for Edge Insertion or (D) for Edge Deletion : ")
+    putStrLn ("Enter your choice for (i) for Edge Insertion or (d) for Edge Deletion : ")
     choice <- getChar
     putStrLn (" Enter the first node of the edge that you want to update : ")
     firstChar <- getChar
@@ -139,8 +136,8 @@ makeDynamicOperation test_db readwritemode = do
       nd1 <- getNdIndex firstChar
       nd2 <- getNdIndex secondChar
       case choice of
-        'I' -> handleInsert nd1 nd2
-        'D' -> handleDelete nd1 nd2 
+        'i' -> handleInsert nd1 nd2
+        'd' -> handleDelete nd1 nd2 
       x <- select [ x | x <- from graph1Table everything ] 
       y <- select [ x | x <- from nodeMapTable everything ]
       return (x,y)
@@ -159,6 +156,7 @@ handleInsert nd1 nd2 = do
   let special1 = isSpecialNode record1
   let special2 = isSpecialNode record2
   let hasparent2 = hasParent record2
+  addEdge nd1 nd2
   if (not isolated1) 
     then do
       if (not isolated2)
@@ -171,6 +169,7 @@ handleInsert nd1 nd2 = do
               else
                 addDirectinAncestors nd1 nd2
               setTreeParent nd2 nd1
+              --addEdge nd1 nd2 -- and the information of (u,v) stored in the intervals
               resetCounter 
               liftIO $ print $ ( " from Case1 Insert - v hasparent2 : ") ++ show hasparent2 ++ " special2 : " ++ show special2
               relabel nd1 [] >> return ()
@@ -184,7 +183,8 @@ handleInsert nd1 nd2 = do
       else
         do
           liftIO $ print ( " case2 insert from ")
-          addEdge nd1 nd2 >> resetCounter >>  relabel 1 [] >>  return ()   --relabel from which point ?
+          --addEdge nd1 nd2 >> 
+          setTreeParent nd2 nd1 >> resetCounter >>  relabel 1 [] >>  return ()   --relabel from which point ?
         
   else
     do
@@ -212,7 +212,7 @@ handleInsert nd1 nd2 = do
               relabel nd1 [] >> return ()   --is it valid  case1 
       else 
         do 
-          addEdge nd1 nd2 
+          --addEdge nd1 nd2 
 --          record1 <- select [(labels) | (labels) <- from graph1Table (at nd1)  ]
 --          record2 <- select [(labels) | (labels) <- from graph1Table (at nd2)  ]
           c_counter <- getCounter
@@ -253,10 +253,10 @@ addEdge nd1 nd2 = do
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
   istreeEdge <- isTreeEdge nd1 nd2
+  deleteEdge nd1 nd2
   case istreeEdge of
     True -> do
       deleteDirectsandAncestors nd1 nd2
-      deleteTreeEdge nd1 nd2
       removeTreeParent nd2
 --      relabel nd2 
     False -> do
@@ -281,16 +281,12 @@ addHop nd1 nd2 = do
       update_ graph1Table (return (nd, Labels tp pr ps (Set.insert nd2 hp) dir) )
 
 
-deleteTreeEdge :: Nd -> Nd -> Daison ()
-deleteTreeEdge nd1 nd2 = do 
-  istreeedge <- isTreeEdge nd1 nd2
-  if istreeedge then
-    do 
-      record <- select [(n, edgs) | (X n edgs) <- from nodeMapTable (at nd1)  ] 
-      case record of
+deleteEdge :: Nd -> Nd -> Daison ()
+deleteEdge nd1 nd2 = do 
+  record <- select [(n, edgs) | (X n edgs) <- from nodeMapTable (at nd1)  ] 
+  case record of
         [(n , edgs)] -> update_ nodeMapTable (return (nd1, X n (List.delete nd2 edgs)) )
-  else 
-    error $ show nd1 ++ " -  " ++ show nd2 ++ " is not a tree edge"
+        _            -> error $ show nd1 ++ " -  " ++ show nd2 ++ " is not an edge"
 
 
 removeTreeParent :: Nd -> Daison ()
@@ -416,10 +412,10 @@ getNdIndex node = do
   case nod of
     [nd] -> return nd
     []   -> do 
-      c_counter <- getCounter
-      incrementCounter >> incrementCounter
+      --c_counter <- getCounter
+      --incrementCounter >> incrementCounter
       pkey <- insert_ nodeMapTable (X node [])
-      store  graph1Table (Just pkey) (Labels (-1) c_counter (c_counter+1) Set.empty Set.empty  )
+      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty  )
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
@@ -511,8 +507,10 @@ getCounter :: Daison Int
 getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
 
 incrementCounter :: Daison ()
-incrementCounter = getCounter >>= \c_counter -> -- liftIO $ print show (c_counter+1) >>
-   update_ counters (return (1, ("counter", c_counter+1) )) 
+incrementCounter = do
+  c_counter <- getCounter  
+  liftIO $ print $ " counter current value : " ++ show (c_counter+1) 
+  update_ counters (return (1, ("counter", c_counter+1) )) 
   
 
 
