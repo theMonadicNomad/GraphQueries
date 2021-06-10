@@ -38,3 +38,4 @@ executables:
       - daison
       - containers
       - ghc-prim
+      - QuickCheck

@@ -1,6 +1,7 @@
 
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 import           Database.Daison
 import           System.Environment
@@ -13,6 +14,8 @@ import qualified Data.List as List
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified System.IO as IO
+import Test.QuickCheck 
+import Data.Maybe (fromJust)
 
 
 type Nd = Key Labels
@@ -23,11 +26,43 @@ type Hops = Set Nd
 type Directs = Set Nd
 type Pre = Int
 type Post = Int
-type Graph =  [(Ndc, [Ndc])]
-type GraphMap = Map Ndc [Ndc]
+--type Graph =  [(Ndc, [Ndc])]
+data Graph a = Graph [(a, [a])] 
+
+
+type GraphMap a = Map a [a]
 type Special = Bool
 type Record = (Nd, Labels)
 type Edges = [Nd]
+
+
+instance Arbitrary (Graph Int) where
+  arbitrary = do 
+    x <- arbitrary :: Gen Int
+    ((List.nub . filter (>= 0)) <$> listOf1 arbitrary) >>= helper
+
+instance Arbitrary (Graph Char) where
+  arbitrary = do 
+    x <- arbitrary :: Gen Char
+    ((List.nub . filter isAlphabet) <$> listOf1 arbitrary) >>= helper
+    
+
+helper :: (Eq a, Arbitrary a) => [a] -> Gen (Graph a)
+helper ls = do
+  let tls = List.tails ls
+      l = length tls - 1
+      t2ls = take l tls
+      gs = map (fromJust . List.uncons) t2ls
+
+  Graph <$> mapM (\(y,ks) -> do
+                            js <- elements . List.subsequences $ ks
+                            return (y, js)
+                 ) gs
+
+isAlphabet :: Char -> Bool
+isAlphabet ch = if ch `elem` ['a'..'z'] || ch `elem` ['A'..'Z']
+		then True 
+		else False
 
 
 type Distance = Int
@@ -52,15 +87,17 @@ data X = X { ndc :: Ndc,
 } deriving (Typeable, Data, Show)
 
 
-graph11 :: Graph
-graph11 = 
+graph11 :: Graph Ndc
+graph11 = Graph
     [ ('a', [ 'b',  'c'] ),
       ('b', [ 'c'] )
     ]
-
-graph2 :: Graph
-graph2 = 
-    [ ( 'a', [  'b',  'c'] ),
+-- a b c d e f g h i j k
+-- a -> random list after a 
+-- b -> random list after b 
+graph2 :: Graph Ndc
+graph2 = Graph
+    [ ( 'a', "bc" {- [  'b',  'c'] -} ),
       ( 'b', [  'd',  'e',  'f' ] ),
       ( 'c', [  'h' ] ),
       ( 'd', [  'k' ] ),
@@ -110,7 +147,8 @@ main = do
     else
       do  -}     
     insert counters (return ( "counter", 0 ))
-    let graphmap1 = Map.fromList graph2
+    let Graph g = graph2
+    let graphmap1 =  Map.fromList g
     process graphmap1
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
@@ -394,12 +432,12 @@ isTheOnlyNonTreeEdge nd1 nd2 = do
           error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
     _ -> error " couldnt find record from isonlynontreeedge "
 
-process :: GraphMap -> Daison ()
+process :: GraphMap Ndc-> Daison ()
 process graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
   processNodes graphmap firstnode firstnode
 
-processNodes :: GraphMap -> Ndc -> Ndc -> Daison()
+processNodes :: GraphMap Ndc -> Ndc -> Ndc -> Daison()
 processNodes graph nd parent = do
   x <- insertNodeinDB nd parent
   unless x $ do
@@ -555,4 +593,14 @@ dfsearch nd1 nd2 = do
     lis@(first : rest) -> case (List.elem nd2 lis) of
       True -> return True
       False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
+
+
+
+prop_graphISearch :: Graph Int-> Bool
+prop_graphISearch graph = True 
+
+
+
+prop_graphCSearch :: Graph Char -> Bool
+prop_graphCSearch graph = True
 
