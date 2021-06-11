@@ -15,6 +15,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import qualified System.IO as IO
 import Test.QuickCheck 
+import Test.QuickCheck.Monadic
 import Data.Maybe (fromJust)
 
 
@@ -41,9 +42,9 @@ instance Arbitrary (Graph Int) where
     x <- arbitrary :: Gen Int
     ((List.nub . filter (>= 0)) <$> listOf1 arbitrary) >>= helper
 
-instance Arbitrary (Graph Char) where
+instance Arbitrary (Graph Ndc) where
   arbitrary = do 
-    x <- arbitrary :: Gen Char
+    x <- arbitrary :: Gen Ndc
     ((List.nub . filter isAlphabet) <$> listOf1 arbitrary) >>= helper
     
 
@@ -59,7 +60,7 @@ helper ls = do
                             return (y, js)
                  ) gs
 
-isAlphabet :: Char -> Bool
+isAlphabet :: Ndc -> Bool
 isAlphabet ch = if ch `elem` ['a'..'z'] || ch `elem` ['A'..'Z']
 		then True 
 		else False
@@ -596,11 +597,35 @@ dfsearch nd1 nd2 = do
 
 
 
-prop_graphISearch :: Graph Int-> Bool
-prop_graphISearch graph = True 
+prop_graphISearch :: Graph Int-> Property
+prop_graphISearch graph =undefined 
 
 
 
-prop_graphCSearch :: Graph Char -> Bool
-prop_graphCSearch graph = True
+prop_graphCSearch :: Graph Ndc -> Property
+prop_graphCSearch graph = monadicIO $ do 
+  (a ,b) <- run $ helper_quickcheck graph
+  assert (a == b) 
 
+helper_quickcheck :: Graph Ndc  -> IO (Bool, Bool)
+helper_quickcheck graph  = do
+    db <- openDB databaseTest  
+    (a,b) <- runDaison db ReadWriteMode $ do 
+      tryCreateTable graph1Table
+      tryCreateTable counters
+      tryCreateTable nodeMapTable
+      insert counters (return ( "counter", 0 ))
+      let Graph g = graph
+      let graphmap1 =  Map.fromList g
+      process graphmap1
+      if (Map.size graphmap1 > 2) then 
+        do 
+          nd1 <- getNdIndex (fst $ Map.elemAt 0 graphmap1)
+          nd2 <- getNdIndex (fst $ Map.elemAt 1 graphmap1)
+          flag1 <- dfsearch nd1 nd2
+          flag2 <- search nd1 nd2 
+          return (flag1, flag2)
+      else return (True, True)
+    closeDB db
+--    helper_quickcheck graph
+    return (a,b)
