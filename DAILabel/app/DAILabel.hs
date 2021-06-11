@@ -625,13 +625,21 @@ helper_quickcheck graph  = do
       let graphmap1 =  Map.fromList g
       process graphmap1
       if (Map.size graphmap1 > 2) then 
-        do 
+        do
+          liftIO $ print  $ " graph " ++ show graphmap1
           nd1 <- getNdIndex (fst $ Map.elemAt 0 graphmap1)
           nd2 <- getNdIndex (fst $ Map.elemAt 1 graphmap1)
           flag1 <- dfsearch nd1 nd2
           flag2 <- search nd1 nd2 
+          dropTable graph1Table
+          dropTable counters
+          dropTable nodeMapTable
           return (flag1, flag2)
-      else return (True, True)
+      else  
+        do 
+          dropTable graph1Table 
+          dropTable counters 
+          dropTable nodeMapTable 
+          return (True, True)
     closeDB db
---    helper_quickcheck graph
     return (a,b)
