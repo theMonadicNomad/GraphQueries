@@ -29,6 +29,7 @@ type Pre = Int
 type Post = Int
 --type Graph =  [(Ndc, [Ndc])]
 data Graph a = Graph [(a, [a])] 
+  deriving Show
 
 
 type GraphMap a = Map a [a]
@@ -138,6 +139,11 @@ databaseTest = "test1.db"
 
 main :: IO ()
 main = do
+  quickCheck prop_graphCSearch
+
+
+main1 :: IO ()
+main1 = do
   db <- openDB databaseTest
   (a,b)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
