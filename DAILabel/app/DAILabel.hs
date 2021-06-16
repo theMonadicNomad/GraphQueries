@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
+
 import           Database.Daison
 import           System.Environment
 import           Data.Data
@@ -17,7 +18,7 @@ import qualified System.IO as IO
 import Test.QuickCheck 
 import Test.QuickCheck.Monadic
 import Data.Maybe (fromJust)
-
+import System.Process (callProcess, callCommand)
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -55,7 +56,6 @@ helper ls = do
       l = length tls - 1
       t2ls = take l tls
       gs = map (fromJust . List.uncons) t2ls
-
   Graph <$> mapM (\(y,ks) -> do
                             js <- elements . List.subsequences $ ks
                             return (y, js)
@@ -84,10 +84,28 @@ data Labels = Labels {
     directs :: Directs
 } deriving (Typeable, Data )
 
-data X = X { ndc :: Ndc, 
+--type Y = X Special2
+
+data X = X { ndc :: Ndc,  
      edges :: Edges
 } deriving (Typeable, Data, Show)
 
+
+
+{- data X Ndc = X { ndc :: Ndc, 
+     edges :: Edges
+} deriving (Typeable, Data, Show)
+ -}
+
+data Special2 = C Ndc | I Int deriving (Eq,Data, Show)
+
+isChar :: Special2 -> Bool
+isChar (C _) = True
+isChar _ = False
+
+isInt :: Special2 -> Bool
+isInt (I _) = True
+isInt _ = False
 
 graph11 :: Graph Ndc
 graph11 = Graph
@@ -125,7 +143,9 @@ graph_index = index graph1Table "node_index" Prelude.id
 nodeMapTable :: Table X
 nodeMapTable = table "nodemap" `withIndex` nodemap_index
 
+--nodemap_index :: Index Y Special2
 nodemap_index :: Index X Ndc
+
 nodemap_index = index nodeMapTable "nodemap_index" ndc 
 
 counters :: Table (String, Int)
@@ -610,36 +630,47 @@ prop_graphISearch graph =undefined
 
 prop_graphCSearch :: Graph Ndc -> Property
 prop_graphCSearch graph = monadicIO $ do 
-  (a ,b) <- run $ helper_quickcheck graph
+  (a ,b) <- run $! ( helper_quickcheck graph)
   assert (a == b) 
 
 helper_quickcheck :: Graph Ndc  -> IO (Bool, Bool)
-helper_quickcheck graph  = do
-    db <- openDB databaseTest  
-    (a,b) <- runDaison db ReadWriteMode $ do 
+helper_quickcheck graph  =  do
+    callCommand ("ls")
+   -- callCommand ("rm " ++ databaseTest)
+    callCommand("ls")
+    db <- openDB databaseTest 
+    print  $ " from liftio outside daison : ++ " ++ show databaseTest
+     
+    (x,y) <-  runDaison db ReadWriteMode $ do 
       tryCreateTable graph1Table
       tryCreateTable counters
       tryCreateTable nodeMapTable
       insert counters (return ( "counter", 0 ))
       let Graph g = graph
       let graphmap1 =  Map.fromList g
-      process graphmap1
-      if (Map.size graphmap1 > 2) then 
-        do
-          liftIO $ print  $ " graph " ++ show graphmap1
-          nd1 <- getNdIndex (fst $ Map.elemAt 0 graphmap1)
-          nd2 <- getNdIndex (fst $ Map.elemAt 1 graphmap1)
-          flag1 <- dfsearch nd1 nd2
-          flag2 <- search nd1 nd2 
-          dropTable graph1Table
-          dropTable counters
-          dropTable nodeMapTable
-          return (flag1, flag2)
-      else  
-        do 
-          dropTable graph1Table 
-          dropTable counters 
-          dropTable nodeMapTable 
-          return (True, True)
+
+      
+      liftIO  $ print  $ " from liftio graph " ++ show graphmap1
+      flagR <- 
+        if (Map.size graphmap1 > 2)
+           then do
+              liftIO $ print  $ " from liftio graph " ++ show graphmap1
+              process graphmap1
+              nd1 <- getNdIndex (fst $ Map.elemAt 0 graphmap1)
+              nd2 <- getNdIndex (fst $ Map.elemAt 1 graphmap1)
+              flag1 <- dfsearch nd1 nd2
+              flag2 <- search nd1 nd2 
+            
+              return (flag1, flag2)
+           else  
+              return (True, True)
+      dropTable graph1Table
+      dropTable counters
+      dropTable nodeMapTable
+      return flagR
+
     closeDB db
-    return (a,b)
+
+    callCommand ("rm " ++ databaseTest)
+    --writeFile databaseTest ""
+    return (x,y)
