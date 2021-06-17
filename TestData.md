@@ -49,3 +49,60 @@
 (10,X {ndc = 'f', keyLabels = 10})
 (11,X {ndc = 'c', keyLabels = 11})
 (12,X {ndc = 'l', keyLabels = 12})
+
+
+
+
+
+
+
+ How to find the previous label
+
+prevOf (PreLabel node) = case prevSibling node of
+    Just prev -> PostLabel prev
+    Nothing -> PreLabel (parentOf node)
+
+prevOf (PostLabel node) = case lastChild node of
+    Just last -> PostLabel last 
+    Nothing -> PreLabel node
+ 
+
+
+nextOf (PreLabel node) = case firstChild node of
+    Just child -> PreLabel child 
+    Nothing -> PostLabel node
+
+nextOf (PostLabel node) = case nextSibling node of
+    Just next -> PreLabel next
+    Nothing -> PostLabel (parentOf node)
+ 
+
+
+
+
+
+(1,TP: 0 Pre: 0 Post:  21 Hops: fromList [] Directs:  fromList [7,8,9,10,11]FC : 2 LC :  11 NS: -100 PS : -100)
+(2,TP: 1 Pre: 1 Post:  18 Hops: fromList [] Directs:  fromList [7,8,9,10]FC : 3 LC :  10 NS: 11 PS : -1)
+(3,TP: 2 Pre: 2 Post:  5 Hops: fromList [] Directs:  fromList []FC : 4 LC :  -1 NS: 5 PS : -1)
+(4,TP: 3 Pre: 3 Post:  4 Hops: fromList [] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : -1)
+(5,TP: 2 Pre: 6 Post:  15 Hops: fromList [] Directs:  fromList [7,8,9]FC : 6 LC :  9 NS: 10 PS : 3)
+(6,TP: 5 Pre: 7 Post:  12 Hops: fromList [] Directs:  fromList [7,8]FC : 7 LC :  8 NS: 9 PS : -1)
+(7,TP: 6 Pre: 8 Post:  9 Hops: fromList [4] Directs:  fromList []FC : 4 LC :  -1 NS: 8 PS : -1)
+(8,TP: 6 Pre: 10 Post:  11 Hops: fromList [4] Directs:  fromList []FC : 4 LC :  -1 NS: -1 PS : 7)
+(9,TP: 5 Pre: 13 Post:  14 Hops: fromList [4] Directs:  fromList []FC : 4 LC :  -1 NS: -1 PS : 6)
+(10,TP: 2 Pre: 16 Post:  17 Hops: fromList [6] Directs:  fromList []FC : 6 LC :  -1 NS: -1 PS : 5)
+(11,TP: 1 Pre: 19 Post:  20 Hops: fromList [9] Directs:  fromList []FC : 9 LC :  -1 NS: -1 PS : 2)
+
+
+
+(1,X {nd = C 'a', edges = [11,2]})
+(2,X {nd = C 'b', edges = [10,5,3]})
+(3,X {nd = C 'd', edges = [4]})
+(4,X {nd = C 'k', edges = []})
+(5,X {nd = C 'e', edges = [9,6]})
+(6,X {nd = C 'g', edges = [8,7]})
+(7,X {nd = C 'i', edges = [4]})
+(8,X {nd = C 'j', edges = [4]})
+(9,X {nd = C 'h', edges = [4]})
+(10,X {nd = C 'f', edges = [6]})
+(11,X {nd = C 'c', edges = [9]})

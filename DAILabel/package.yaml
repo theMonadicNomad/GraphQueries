@@ -39,3 +39,4 @@ executables:
       - containers
       - ghc-prim
       - QuickCheck
+      - process
