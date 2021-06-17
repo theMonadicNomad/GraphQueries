@@ -26,8 +26,8 @@ type Ndc = Char
   --deriving (Eq, Ord, Read, Data)
 type Hops = Set Nd
 type Directs = Set Nd
-type Pre = Int
-type Post = Int
+--type Pre = Int
+--type Post = Int
 --type Graph =  [(Ndc, [Ndc])]
 data Graph a = Graph [(a, [a])] 
   deriving Show
@@ -44,8 +44,8 @@ data PrePostRef = PreLabel Nd | PostLabel Nd
 
 data Labels = Labels {
     tree_parent :: Nd,
-    pre :: Pre,
-    post :: Post,
+    pre :: Nd,
+    post :: Nd,
     hops :: Hops,
     directs :: Directs,
     firstChild :: Nd,
@@ -76,7 +76,8 @@ isInt _ = False -}
 graph11 :: Graph Node
 graph11 = Graph
     [ (C 'a', [ C 'b', C 'c'] ),
-      (C 'b', [ C 'c'] )
+      (C 'b', [ C 'c'] ),
+      (C 'c', [])
     ]
  
 
@@ -116,11 +117,11 @@ nodeMapTable = table "nodemap" `withIndex` nodemap_index
 nodemap_index :: Index X Node
 nodemap_index = index nodeMapTable "nodemap_index" nd
 
-counters :: Table (String, Int)
+counters :: Table (String, Nd)
 counters = table "counter" 
              `withIndex` counter_index
 
-counter_index :: Index (String, Int) String
+counter_index :: Index (String, Nd) String
 counter_index = index counters "counter_index" fst
 
 databaseTest = "test1.db"
@@ -169,7 +170,7 @@ main = do
     else
       do  -}     
     insert counters (return ( "counter", 0 ))
-    let Graph g = graph2
+    let Graph g = graph11
     let graphmap1 =  Map.fromList g
     process graphmap1
     a <- select [ x | x <- from graph1Table everything ]
@@ -187,6 +188,42 @@ process graphmap = do
   processNodes graphmap firstnode firstnode
   parents <- getAllParents firstnode
   processSiblings parents
+
+
+
+getLabel :: PrePostRef -> Daison Nd
+getLabel (PreLabel nd) = do 
+  record <- select [label1 | (label1) <- from graph1Table (at nd)  ]
+  case record of
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> return pr
+getLabel (PostLabel nd) = do 
+  record <- select [label1 | (label1) <- from graph1Table (at nd)  ]
+  case record of
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> return ps
+
+nextOf :: PrePostRef -> Daison Nd 
+nextOf (PreLabel nd) = do 
+  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
+  case record of
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> if fc >0 then getLabel (PreLabel fc) 
+      else return ps
+nextOf (PostLabel nd) = do 
+  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
+  case record of
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> if ns >0 then getLabel (PreLabel ns)  
+      else getLabel (PostLabel trp)
+
+prevOf :: PrePostRef -> Daison Nd 
+prevOf (PreLabel nd) = do 
+  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
+  case record of
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> if ls >0 then getLabel (PostLabel ls) 
+      else getLabel (PreLabel trp)
+prevOf (PostLabel nd) = do 
+  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
+  case record of
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> if lc >0 then getLabel (PostLabel lc)  
+      else return pr
 
 
 getAllParents :: Node -> Daison (Set Nd)
@@ -346,7 +383,7 @@ getParent node = do
       (Labels trp _ _ _ _ _ _ _ _ ) -> return trp
     _           -> error "multiple parents error "
 
-getCounter :: Daison Int
+getCounter :: Daison Nd
 getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
 
 incrementCounter :: Daison ()
