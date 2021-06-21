@@ -293,8 +293,8 @@ handleInsert nd1 nd2 = do
         [(Labels tp pr ps hp dir _ _ _ _ )] ->  tp > 0
 --        _  -> return False
     isIsolated record = case record of
-        [(Labels tp _ _ _ _ _ _ _ _ )] -> tp == -1
-        _  ->  False
+        [(Labels tp _ _ _ _ _ _ _ _ )] -> False-- tp == -1
+        _  ->  True
     getDirects record = case record of
         [(Labels tp pr ps hp dir _ _ _ _)] -> return dir
     setTreeParent nd1 nd2 = do
@@ -376,8 +376,41 @@ relabel nd visited =  do
          return (nd : nv)
 
 
+{- relabel2 :: Nd -> [Nd] -> Daison ()
+relabel2 nd visited =  do 
+  let d = 3
+  let count = 2
+  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
+  case record of
+    [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
+      (Newd, Newcount,v, begin, end) <- mainLoop d count pr pr pr
+      return ()
+  return ()
+
+mainLoop :: Int -> Int-> Nd -> Nd -> Nd -> Daison (Int, Int, Nd, Nd, Nd)
+mainloop d count v begin end = do
+  max <- getCounter
+  if (d < max) then 
+    do 
+      (begin1 count1 v1 d1)  <- innerLoop "prev" begin count v d
+      (begin2 count2 v2 d2)  <- innerLoop "next" begin1 count1 v1 d1
+      if (count2 * count2 < d2 +1  ) then 
+        return (d2, count2, v2, begin2, end2)
+      else
+        d3 = d2 .|. (shiftL d 1)
+        mainLoop d3 count2 v2 begin2 end2
+
+  else 
+    return (d, count, v, begin, end)
 
 
+innerLoop :: String-> Nd -> Int-> Nd ->Int -> Daison (String, Nd, Int,Nd,Int )
+innerLoop str begin count v d = do
+  case str of 
+    "prev" -> do 
+      current_begin <- prevOf begin
+      if ()
+ -}
 
 
 getLabel :: PrePostRef -> Daison Nd
@@ -596,7 +629,7 @@ getNdIndex node = do
       --c_counter <- getCounter
       --incrementCounter >> incrementCounter
       pkey <- insert_ nodeMapTable (X node [])
-      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
+--      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
