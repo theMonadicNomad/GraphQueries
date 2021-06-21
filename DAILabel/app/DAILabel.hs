@@ -248,7 +248,7 @@ handleInsert nd1 nd2 = do
         do
           liftIO $ print ( " case2 insert from ")
           --addEdge nd1 nd2 >> 
-          setTreeParent nd2 nd1 >> resetCounter >>  relabel2 1 [] >>  return ()   --relabel from which point ?
+          setTreeParent nd2 nd1 >> resetCounter >>  relabel 1 [] >>  return ()   --relabel from which point ?
         
   else
     do
@@ -379,6 +379,7 @@ relabel nd visited =  do
 
 
 
+
 getLabel :: PrePostRef -> Daison Nd
 getLabel (PreLabel nd) = do 
   record <- select [label1 | (label1) <- from graph1Table (at nd)  ]
@@ -389,29 +390,29 @@ getLabel (PostLabel nd) = do
   case record of
     [(Labels trp pr ps hp dir fc lc ns ls)] -> return ps
 
-nextOf :: PrePostRef -> Daison Nd 
+nextOf :: PrePostRef -> Daison PrePostRef 
 nextOf (PreLabel nd) = do 
   record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
   case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> if fc >0 then getLabel (PreLabel fc) 
-      else return ps
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> if fc >0 then return (PreLabel fc) 
+      else return (PostLabel nd)
 nextOf (PostLabel nd) = do 
   record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
   case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> if ns >0 then getLabel (PreLabel ns)  
-      else getLabel (PostLabel trp)
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> if ns >0 then return (PreLabel ns)  
+      else return (PostLabel trp)
 
-prevOf :: PrePostRef -> Daison Nd 
+prevOf :: PrePostRef -> Daison PrePostRef
 prevOf (PreLabel nd) = do 
   record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
   case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> if ls >0 then getLabel (PostLabel ls) 
-      else getLabel (PreLabel trp)
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> if ls >0 then return  (PostLabel ls) 
+      else return (PreLabel trp)
 prevOf (PostLabel nd) = do 
   record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
   case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> if lc >0 then getLabel (PostLabel lc)  
-      else return pr
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> if lc >0 then  return (PostLabel lc)  
+      else return (PreLabel nd)
 
 
 
