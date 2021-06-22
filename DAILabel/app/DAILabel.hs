@@ -33,7 +33,7 @@ type Directs = Set Nd
 data Graph a = Graph [(a, [a])] 
   deriving Show
 
---max = maxBound :: Nd
+max = maxBound :: Nd
 
 type GraphMap a = Map a [a]
 type Special = Bool
@@ -100,8 +100,8 @@ graph2 = Graph
 
 
 instance Show Labels where
-  show (Labels a b c d e f g h i) = "TP: " ++  show a ++ " Pre: " ++ show b ++
-   " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e ++
+  show (Labels a b c d e f g h i) = "TP: " ++  show a ++  " Pre: " ++ show b ++
+   " Post:  " ++ show c  ++   " Hops: " ++ show d ++ " Directs:  " ++ show e ++
    "FC : " ++ show f ++ " LC :  " ++ show g ++ " NS: " ++ show h ++ " PS : " ++ show i
 
 graph1Table :: Table (Labels)
@@ -171,7 +171,7 @@ main = do
     else
       do  -}     
     insert counters (return ( "counter", 0 ))
-    let Graph g = graph11
+    let Graph g = graph2
     let graphmap1 =  Map.fromList g
     process graphmap1
     a <- select [ x | x <- from graph1Table everything ]
@@ -180,7 +180,7 @@ main = do
   mapM_ (\y -> putStrLn (show y) ) a
   mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
-  makeDynamicOperation databaseTest ReadWriteMode
+  --makeDynamicOperation databaseTest ReadWriteMode
 
 makeDynamicOperation :: String -> AccessMode -> IO()
 makeDynamicOperation test_db readwritemode = do
@@ -547,78 +547,61 @@ isTheOnlyNonTreeEdge nd1 nd2 = do
 process :: GraphMap Node -> Daison ()
 process graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
-  processNodes graphmap firstnode firstnode
-  parents <- getAllParents firstnode
-  processSiblings parents
+  pkey <-  insert_ nodeMapTable (X (C 'r') [])
+  store graph1Table (Just pkey) (Labels 0 0 Main.max Set.empty Set.empty (-100) (-100) (-100) (-100) )    
+  let values = snd $ Map.elemAt 0 graphmap
+  processNodes graphmap firstnode (C 'r') 
 
-
-
-
-
-getAllParents :: Node -> Daison (Set Nd)
-getAllParents nd = do
-  parentsList <- select [a | (ind, ( Labels a b c d e f g h i  )) <- from graph1Table everything , a > 0  ]
-  let parents = Set.fromList parentsList
-  return parents
-
-processSiblings :: (Set Nd )-> Daison()
-processSiblings parents = do
-  let parentsList = Set.toList parents
-  mapM_ (\x -> getSiblings x  ) parentsList
-
-getSiblings :: Nd -> Daison()
-getSiblings nd = do
-  edgesList <- select [edges | ( X nds edges ) <- from nodeMapTable (at nd)  ]
-  let edges = head edgesList
-  case edges of
-    [] -> return ()
-    [ele] -> updateSiblings (-1) ele (-1)
-    first : second : [] -> updateSiblings (-1) first second >> updateSiblings first second (-1)
-    rest -> do
-      let values = ( last (init rest) ,last rest, -1) : (-1, head rest, head (tail rest) ) : zip3 (rest) ((tail rest)) (tail (tail rest))
-      mapM_ (\(x,y,z) -> updateSiblings x y z ) values
-  
 updateSiblings :: Nd -> Nd -> Nd -> Daison ()
 updateSiblings left nd right = do
   record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
   case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> update_ graph1Table (return (nd, Labels trp pr ps hp dir fc lc left right ))
+    [(Labels trp pr ps hp dir fc lc ns ls)] -> update_ graph1Table (return (nd, Labels trp pr ps hp dir fc lc right left ))
 
 
 processNodes :: GraphMap Node -> Node -> Node -> Daison()
 processNodes graph nd parent = do
-  x <- insertNodeinDB nd parent
+  x <- insertNodeinDB nd parent 
   unless x $ do
     let adjacent = Map.lookup nd graph
     case adjacent of
- --     Nothing -> return ()
       Nothing      -> do
         nod <- getNdIndex nd 
         record <- select [(nod,label1) | (label1) <- from graph1Table (at nod)  ] 
+        liftIO $ print $ " Nothing : " ++ show record
         case record of 
           [(nd, label)] -> case label of
             Labels trp pr ps hp dir fc lc ns ls ->  update_ graph1Table (return (nd, Labels trp pr ps hp dir (-1) (-1) ns ls ))
       Just []   ->do
         nod <- getNdIndex nd 
         record <- select [(nod,label1) | (label1) <- from graph1Table (at nod)  ] 
+        liftIO $ print $ " just : " ++ show record
         case record of 
           [(nd, label)] -> case label of
             Labels trp pr ps hp dir fc lc ns ls ->  update_ graph1Table (return (nd, Labels trp pr ps hp dir (-1) (-1) ns ls ))
-
       Just rest    ->do
         mapM_ (\x -> processNodes graph x nd ) rest
+        children <- mapM (\x -> getNdIndex x) rest 
         nod <- getNdIndex nd 
+        case filter (>nod) children of 
+          [] -> return ()
+          [ele] -> updateSiblings  (-1) ele (-1)
+          first : second : [] -> updateSiblings  (-1) first second >> updateSiblings first second   (-1)
+          list -> do 
+            let values =  (( (-1) , head list, head (tail list) ) : zip3 (list) ((tail list)) (tail (tail list)) )++ [( last (init list) ,last list,  (-1))]
+            mapM_ (\(left, ele , right) -> updateSiblings left ele right) values
+        
         record <- select [(nod,label1) | (label1) <- from graph1Table (at nod)  ] 
         case record of 
           [(nd, label)] -> case label of
             Labels trp pr ps hp dir fc lc ns ls ->  do
               first_child <- getNdIndex (head rest) >>= \fc -> if nd > fc then return (-1) else return fc
               case (tail rest) of 
-                []  -> update_ graph1Table (return (nd, Labels trp pr ps hp dir first_child (-1) ns ls ))
+                []  -> update_ graph1Table (return (nd, Labels trp pr ps hp dir first_child first_child ns ls ))
                 child -> do 
                   last_child <- getNdIndex (last rest) >>= \lc -> if nd > lc then return (-1) else return lc
                   update_ graph1Table (return (nd, Labels trp pr ps hp dir first_child last_child ns ls ))
-    getNdIndex nd >>= \nd1 -> updatePost nd1
+--    getNdIndex nd >>= \nd1 -> updatePost nd1
     
 
 getNdIndex node = do
@@ -635,8 +618,8 @@ getNdIndex node = do
 
 
 
-insertNodeinDB :: Node -> Node -> Daison Bool
-insertNodeinDB node parent = do
+insertNodeinDB :: Node -> Node ->Daison Bool
+insertNodeinDB node parent  = do
   map <- select [ind | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == node  ]
   par <- if (node == parent) then return [(0,( C 'a',[]))] 
          else select [(ind,(nd, edgess)) | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == parent  ]
@@ -645,12 +628,18 @@ insertNodeinDB node parent = do
   let parent_ndc = fst . snd . head $ par
   case map of
     [] -> do
-      c_counter <- getCounter
-      incrementCounter
+{-       c_counter <- getCounter
+      incrementCounter -}
+      l_pre <- prevOf (PostLabel parent_ndmp) >>= \x -> getLabel x
+      l_post <- getLabel (PostLabel parent_ndmp)
+      let pre = average l_pre l_post
+      let post = average pre l_post
+      liftIO $ print  $ " l_pre : " ++ show l_pre ++ " l_post : " ++ show l_post ++ " pre : " ++ show pre ++ " post : " ++ show post
+
       pkey <-  insert_ nodeMapTable (X node [])
-      store graph1Table (Just pkey) (Labels parent_ndmp c_counter c_counter Set.empty Set.empty (-100) (-100) (-100) (-100) )    
+      store graph1Table (Just pkey) (Labels parent_ndmp pre post Set.empty Set.empty (-100) (-100) (-100) (-100) )    
       
-      when (parent_ndmp > 0) $ do
+      when (parent_ndmp > 1) $ do
 --        parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
 --        case parent_record of
 --          [(indp ,(Labels ptrp ppr pps php pdir pte))] -> update_ graph1Table (return (indp,(Labels ptrp ppr pps php pdir (pkey:pte)) ))
@@ -665,16 +654,12 @@ insertNodeinDB node parent = do
           [(indp, labelp)] -> case labelp of 
             (Labels ptrp ppr pps php pdir fc lc ns ls) -> do
               update_ graph1Table (return (indp,(Labels ptrp ppr pps (Set.insert (head map) php ) pdir fc lc ns ls ) ))
-              when (ptrp > 0) $ updateDirects parent_ndmp ptrp 
+              when (ptrp > 1) $ updateDirects parent_ndmp ptrp 
       update_ nodeMapTable  (return (parent_ndmp, (X (parent_ndc) (nod:edges_par) ) ))
 
       return True 
-{-     first : rest -> error "duplicate records in the database table, please verify"
- -}
-
-
-
-
+  where
+    average x y = (div x 2) + (div y 2)
 
 updatePost :: Nd -> Daison ()
 updatePost nd = do 
@@ -697,9 +682,9 @@ updateDirects parent gp = do
         update_ graph1Table (return (nd, Labels trp pr ps hp (Set.insert parent dir) fc lc ns ls ))
       _ -> error "updatedirects error"
     _   -> liftIO $ print record
-  when (gp /= 0) $ do
+  when (gp > 1) $ do
     ggp <- getParent gp
-    when (ggp /= 0) $ updateDirects parent ggp
+    when (ggp > 1) $ updateDirects parent ggp
 
 
 
@@ -718,7 +703,7 @@ getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . h
 incrementCounter :: Daison ()
 incrementCounter = do
   c_counter <- getCounter  
-  liftIO $ print $ " counter current value : " ++ show (c_counter+1) 
+--  liftIO $ print $ " counter current value : " ++ show (c_counter+1) 
   update_ counters (return (1, ("counter", c_counter+1) )) 
   
 
