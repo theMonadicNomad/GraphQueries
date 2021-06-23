@@ -20,6 +20,7 @@ import Test.QuickCheck.Monadic
 import Data.Maybe (fromJust)
 import System.Process (callProcess, callCommand)
 import Data.Bits
+import Data.Int
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -376,40 +377,72 @@ relabel nd visited =  do
          return (nd : nv)
 
 
-{- relabel2 :: Nd -> [Nd] -> Daison ()
-relabel2 nd visited =  do 
+relabel2 :: PrePostRef -> Daison ()
+relabel2  (PreLabel nd) =  do 
   let d = 3
   let count = 2
-  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
+  record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
   case record of
     [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
-      (Newd, Newcount,v, begin, end) <- mainLoop d count pr pr pr
+      (newd, newcount,v, begin, end) <- mainLoop d count (PreLabel nd) (PreLabel nd) (PreLabel nd)
       return ()
   return ()
 
-mainLoop :: Int -> Int-> Nd -> Nd -> Nd -> Daison (Int, Int, Nd, Nd, Nd)
-mainloop d count v begin end = do
+mainLoop :: Int64 -> Int-> PrePostRef ->PrePostRef -> PrePostRef -> Daison (Nd, Int, PrePostRef, PrePostRef, PrePostRef)
+mainLoop d count v begin end = do
   max <- getCounter
   if (d < max) then 
     do 
-      (begin1 count1 v1 d1)  <- innerLoop "prev" begin count v d
-      (begin2 count2 v2 d2)  <- innerLoop "next" begin1 count1 v1 d1
-      if (count2 * count2 < d2 +1  ) then 
-        return (d2, count2, v2, begin2, end2)
+      (begin1, count1, v1, d1)  <- goPrev (begin) count v d
+      (end1, count2, v2, d2)  <- goNext (end) count1 v1 d1
+      if (count2 * count2 < fromIntegral (d2 +1)  ) then 
+        return (d2, count2, v2, begin1, end1)
       else
-        d3 = d2 .|. (shiftL d 1)
-        mainLoop d3 count2 v2 begin2 end2
-
+        do 
+          let d3 = d2 .|. (shiftL d 1)
+          mainLoop d3 count2 v2 begin1 end1
   else 
     return (d, count, v, begin, end)
 
 
-innerLoop :: String-> Nd -> Int-> Nd ->Int -> Daison (String, Nd, Int,Nd,Int )
-innerLoop str begin count v d = do
-  case str of 
-    "prev" -> do 
-      current_begin <- prevOf begin
-      if ()
+goPrev :: PrePostRef -> Int -> PrePostRef -> Int64 -> Daison (PrePostRef, Int, PrePostRef, Int64)
+goPrev begin count v d = do 
+  vlabel <- getLabel v
+  newbegin <- prevOf begin 
+  newbeginLabel <- getLabel (newbegin)
+  if (newbeginLabel > (vlabel .|. complement d)) then 
+    goPrev newbegin (count +1) v d
+  else return (begin, count, v, d)
+
+
+goNext :: PrePostRef -> Int -> PrePostRef -> Int64 -> Daison (PrePostRef, Int, PrePostRef, Int64)
+goNext end count v d = do 
+  vlabel <- getLabel v
+  newend <- prevOf end
+  newendLabel <- getLabel (newend)
+  if (newendLabel > (vlabel .|. d)) then 
+    goNext newend (count +1) v d
+  else return (end, count, v, d)
+
+
+{- 
+
+
+d = 0b11 -- binary number 
+count = 2
+while d < max
+  while label(prevOf begin) > (v .&. negate d) 
+        begin = prevOf begin
+        count = count + 1
+  while label(nextOf end) > (v .|. d) 
+      end = prevOf end
+      count = count + 1
+  if count * count < d + 1 
+    break
+  d = d .|. (d `shiftL` 1)
+ 
+
+
  -}
 
 

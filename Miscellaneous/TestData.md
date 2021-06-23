@@ -131,3 +131,20 @@ nextOf (PostLabel node) = case nextSibling node of
 (10,X {nd = C 'h', edges = [5]})
 (11,X {nd = C 'f', edges = [7]})
 (12,X {nd = C 'c', edges = [10]})
+
+
+
+
+
+1,TP: 0 Pre: 0 Post:  9223372036854775807 Hops: fromList [] Directs:  fromList []FC : -100 LC :  -100 NS: -100 PS : -100)
+(2,TP: 1 Pre: 4611686018427387903 Post:  6917529027641081854 Hops: fromList [] Directs:  fromList [8,9,10,11,12]FC : 3 LC :  12 NS: -100 PS : -100)
+(3,TP: 2 Pre: 5764607523034234878 Post:  6341068275337658366 Hops: fromList [] Directs:  fromList [8,9,10,11]FC : 4 LC :  11 NS: 12 PS : -1)
+(4,TP: 3 Pre: 6052837899185946622 Post:  6196953087261802494 Hops: fromList [] Directs:  fromList []FC : 5 LC :  5 NS: 6 PS : -1)
+(5,TP: 4 Pre: 6124895493223874558 Post:  6160924290242838526 Hops: fromList [] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : -1)
+(6,TP: 3 Pre: 6052837899185946622 Post:  6196953087261802494 Hops: fromList [] Directs:  fromList [8,9,10]FC : 7 LC :  10 NS: 11 PS : 4)
+(7,TP: 6 Pre: 6124895493223874558 Post:  6160924290242838526 Hops: fromList [] Directs:  fromList [8,9]FC : 8 LC :  9 NS: 10 PS : -1)
+(8,TP: 7 Pre: 6142909891733356542 Post:  6151917090988097534 Hops: fromList [5] Directs:  fromList []FC : -1 LC :  -1 NS: 9 PS : -1)
+(9,TP: 7 Pre: 6142909891733356542 Post:  6151917090988097534 Hops: fromList [5] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 8)
+(10,TP: 6 Pre: 6124895493223874558 Post:  6160924290242838526 Hops: fromList [5] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 7)
+(11,TP: 3 Pre: 6052837899185946622 Post:  6196953087261802494 Hops: fromList [7] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 6)
+(12,TP: 2 Pre: 5764607523034234878 Post:  6341068275337658366 Hops: fromList [10] Directs:  fromList []FC : -1 LC :  -1 NS: -1 P
