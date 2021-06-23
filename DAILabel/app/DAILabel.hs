@@ -257,12 +257,14 @@ handleInsert nd1 nd2 = do
         then do
           if hasparent2
             then do
-              c_counter <- getCounter
-              incrementCounter
-              incrementCounter
+              c_max <- getMax
+--              incrementCounter
+--              incrementCounter
 --              record <- select [(labels) | (labels) <- from graph1Table (at nd1)  ]
               case record1 of --how the new node is inserted
-                [(Labels tp pr ps hp dir fc lc ns ls)] -> update_ graph1Table (return (nd1, Labels tp c_counter (c_counter+1) (Set.insert nd2 hp) dir fc lc ns ls) )   
+                [(Labels tp pr ps hp dir fc lc ns ls)] -> update_ graph1Table (return (nd1, Labels tp (c_max * 2 ) (c_max * 3) (Set.insert nd2 hp) dir fc lc ns ls) )   
+              update_ counters (return (2, ("max", (c_max * 3) ) ))
+
               liftIO $ print ( " from Case3 -- HasParent2 Insert")
           else
             do               
@@ -280,12 +282,13 @@ handleInsert nd1 nd2 = do
           --addEdge nd1 nd2 
 --          record1 <- select [(labels) | (labels) <- from graph1Table (at nd1)  ]
 --          record2 <- select [(labels) | (labels) <- from graph1Table (at nd2)  ]
-          c_counter <- getCounter
-          incrementCounter >> incrementCounter >> incrementCounter >> incrementCounter
+          c_max <- getMax
+--          incrementCounter >> incrementCounter >> incrementCounter >> incrementCounter
           case record1 of
-            [(Labels tp pr ps hp dir fc lc ns ls)] -> update_ graph1Table (return (nd1, Labels 0 c_counter (c_counter+3) hp dir fc lc ns ls) ) 
+            [(Labels tp pr ps hp dir fc lc ns ls)] -> update_ graph1Table (return (nd1, Labels 0 (c_max * 2) (c_max * 5) hp dir fc lc ns ls) ) 
           case record2 of
-            [(Labels tp pr ps hp dir fc lc ns ls)] -> update_ graph1Table (return (nd2, Labels nd1 (c_counter+1) (c_counter+2) hp dir fc lc ns ls) ) 
+            [(Labels tp pr ps hp dir fc lc ns ls)] -> update_ graph1Table (return (nd2, Labels nd1 (c_max  * 3) (c_max * 4 ) hp dir fc lc ns ls) ) 
+          update_ counters (return (2, ("max", (c_max * 5) ) ))
           liftIO $ print ( " from Case4 Insert")
  
   return ()
@@ -377,16 +380,23 @@ relabel nd visited =  do
          return (nd : nv)
 
 
-relabel2 :: PrePostRef -> Daison ()
-relabel2  (PreLabel nd) =  do 
+reLabelMain :: PrePostRef -> Daison ()
+reLabelMain  (PreLabel nd) =  do 
   let d = 3
   let count = 2
   record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
   case record of
     [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
       (newd, newcount,v, begin, end) <- mainLoop d count (PreLabel nd) (PreLabel nd) (PreLabel nd)
+      reLabel begin end v newd newcount
       return ()
   return ()
+
+reLabel :: PrePostRef -> PrePostRef -> PrePostRef -> Int64 ->Int -> Daison()
+reLabel begin end v d count = undefined
+
+
+
 
 mainLoop :: Int64 -> Int-> PrePostRef ->PrePostRef -> PrePostRef -> Daison (Nd, Int, PrePostRef, PrePostRef, PrePostRef)
 mainLoop d count v begin end = do
@@ -732,6 +742,13 @@ getParent node = do
 
 getCounter :: Daison Nd
 getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
+
+
+getMax :: Daison Nd
+getMax = select [ x | x <- from counters (at 2) ] >>= \p -> return . snd . head $ p  
+
+
+
 
 incrementCounter :: Daison ()
 incrementCounter = do
