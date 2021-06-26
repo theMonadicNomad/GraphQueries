@@ -148,3 +148,35 @@ nextOf (PostLabel node) = case nextSibling node of
 (10,TP: 6 Pre: 6124895493223874558 Post:  6160924290242838526 Hops: fromList [5] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 7)
 (11,TP: 3 Pre: 6052837899185946622 Post:  6196953087261802494 Hops: fromList [7] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 6)
 (12,TP: 2 Pre: 5764607523034234878 Post:  6341068275337658366 Hops: fromList [10] Directs:  fromList []FC : -1 LC :  -1 NS: -1 P
+
+
+--correct pre and post order
+(0,TP: 0 Pre: 0 Post:  9223372036854775807 Hops: fromList [] Directs:  fromList []FC : 1 LC :  1 NS: -100 PS : -100)
+(1,TP: 0 Pre: 4611686018427387903 Post:  6917529027641081854 Hops: fromList [] Directs:  fromList [6,7,8,9,10,11]FC : 2 LC :  11 NS: -1 PS : -1)
+(2,TP: 1 Pre: 5764607523034234878 Post:  6341068275337658366 Hops: fromList [] Directs:  fromList [6,7,8,9,10]FC : 3 LC :  10 NS: 11 PS : -1)
+(3,TP: 2 Pre: 6052837899185946622 Post:  6196953087261802494 Hops: fromList [] Directs:  fromList []FC : 4 LC :  4 NS: 5 PS : -1)
+(4,TP: 3 Pre: 6124895493223874558 Post:  6160924290242838526 Hops: fromList [] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : -1)
+(5,TP: 2 Pre: 6269010681299730430 Post:  6305039478318694398 Hops: fromList [] Directs:  fromList [6,7,8,9]FC : 6 LC :  9 NS: 10 PS : 3)
+(6,TP: 5 Pre: 6287025079809212414 Post:  6296032279063953406 Hops: fromList [7,8] Directs:  fromList [7,8]FC : 7 LC :  8 NS: 9 PS : -1)
+(7,TP: 6 Pre: 6291528679436582910 Post:  6293780479250268158 Hops: fromList [4] Directs:  fromList []FC : -1 LC :  -1 NS: 8 PS : -1)
+(8,TP: 6 Pre: 6294906379157110782 Post:  6295469329110532094 Hops: fromList [4] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 7)
+(9,TP: 5 Pre: 6300535878691323902 Post:  6302787678505009150 Hops: fromList [4] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 6)
+(10,TP: 2 Pre: 6323053876828176382 Post:  6332061076082917374 Hops: fromList [6] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 5)
+(11,TP: 1 Pre: 6629298651489370110 Post:  6773413839565225982 Hops: fromList [9] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 2)
+(0,X {nd = S "root", edges = []})
+(1,X {nd = C 'a', edges = []})
+(2,X {nd = C 'b', edges = []})
+(3,X {nd = C 'd', edges = []})
+(4,X {nd = C 'k', edges = []})
+(5,X {nd = C 'e', edges = []})
+(6,X {nd = C 'g', edges = []})
+(7,X {nd = C 'i', edges = []})
+(8,X {nd = C 'j', edges = []})
+(9,X {nd = C 'h', edges = []})
+(10,X {nd = C 'f', edges = []})
+(11,X {nd = C 'c', edges = []})
+
+
+
+
+
