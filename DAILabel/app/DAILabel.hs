@@ -47,8 +47,8 @@ data PrePostRef = PreLabel Nd | PostLabel Nd deriving Eq
 
 data Labels = Labels {
     tree_parent :: Nd,
-    pre :: Nd,
-    post :: Nd,
+    preL :: Nd,
+    postL :: Nd,
     hops :: Hops,
     directs :: Directs,
     firstChild :: Nd,
@@ -183,7 +183,7 @@ main = do
   mapM_ (\y -> putStrLn (show y) ) a
   mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
-  --makeDynamicOperation databaseTest ReadWriteMode
+  makeDynamicOperation databaseTest ReadWriteMode
 
 makeDynamicOperation :: String -> AccessMode -> IO()
 makeDynamicOperation test_db readwritemode = do
@@ -313,6 +313,39 @@ insertNodeinDB node parent  = do
   where
     average x y = (div x 2) + (div y 2)
 
+updateLabel :: Labels ->Nd ->Labels -> Nd -> Daison()
+updateLabel record@(Labels ptrp ppr pps _ _ pfc flc pns pls ) nd1 record1@(Labels _ pr1 ps1 _ _ fc1  rlc1 ns1 _) nd2 
+  | nd2 < 0 = do  
+    let pre1 = average ppr pps
+    let post1 = average pre1 pps
+    store graph1Table (Just nd1) record1{preL = pre1, postL =post1}
+    if (ns1>0) then updateLabel record nd1 record1 ns1 else return()
+    if (fc1 > 0 ) then 
+      do 
+        res3 <- query firstRow (from graph1Table (at fc1)) 
+        updateLabel record1 fc1 res3 (-1) 
+      else return()
+
+    return ()
+  | otherwise = do
+    res2 <- query firstRow (from graph1Table (at nd2))
+    case res2 of 
+      record2@(Labels _ pr2 ps2 _ _ fc2  rlc2 ns2 _) -> do 
+            let pre2 = average pps ps1
+            let post2 = average pre2 pps
+            store graph1Table (Just nd1) record1{preL = pre2, postL =post2}
+            if (ns2 > 0) then updateLabel record nd2 record2 ns2 else return()
+            if (fc2 > 0) then 
+              do 
+                res3 <- query firstRow (from graph1Table (at fc2)) 
+                updateLabel record2 fc2 res3 (-1) 
+              else return()
+
+    return()
+  where 
+    average x y = (div x 2) + (div y 2)
+
+
 
 
 handleInsert :: Nd -> Nd -> Daison ()
@@ -326,7 +359,8 @@ handleInsert nd1 nd2 = do
               if Set.null hp1
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)                        -- Case 1.1.1
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)                        -- Case 1.1.2
-              update_ graph1Table (return (nd2, record2{tree_parent=nd1, nextSibling=fc1}))
+              update_ graph1Table (return (nd2, record2{tree_parent=nd1{- , nextSibling=fc1 -}}))
+              updateLabel record1 nd2 record2 (-1)
               {- TODO: - update the pre and post labels of nd2 and its children.
                           All the labels must be moved right after PreLabel nd1.
                        - update prevSibling for the firstChild of nd1
