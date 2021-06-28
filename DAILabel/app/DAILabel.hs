@@ -78,7 +78,10 @@ graph11 :: Graph Node
 graph11 = Graph
     [ (C 'a', [ C 'b', C 'c'] ),
       (C 'b', [ C 'c'] ),
-      (C 'c', [])
+      (C 'c', []),
+      (C 'd', [C 'e']),
+      (C 'e', [C 'f'] ),
+      (C 'f', [])
     ]
  
 
@@ -171,7 +174,7 @@ main = do
     else
       do  -}     
     insert counters (return ( "l_max", Main.max ))
-    let Graph g = graph2
+    let Graph g = graph11
     let graphmap1 =  Map.fromList g
     process graphmap1
     --store nodeMapTable (Just 0) (X (S "root" ) [])
@@ -319,11 +322,13 @@ updateLabel record@(Labels ptrp ppr pps _ _ pfc flc pns pls ) nd1 record1@(Label
     let pre1 = average ppr pps
     let post1 = average pre1 pps
     store graph1Table (Just nd1) record1{preL = pre1, postL =post1}
-    if (ns1>0) then updateLabel record nd1 record1 ns1 else return()
+--    liftIO $ print $ " nd :" ++ show nd1 ++ " from if : " ++ show record1
+
+    if (ns1>0) then updateLabel record nd1 record1{preL = pre1, postL =post1} ns1 else return()
     if (fc1 > 0 ) then 
       do 
         res3 <- query firstRow (from graph1Table (at fc1)) 
-        updateLabel record1 fc1 res3 (-1) 
+        updateLabel record1{preL = pre1, postL =post1} fc1 res3 (-1) 
       else return()
 
     return ()
@@ -333,12 +338,13 @@ updateLabel record@(Labels ptrp ppr pps _ _ pfc flc pns pls ) nd1 record1@(Label
       record2@(Labels _ pr2 ps2 _ _ fc2  rlc2 ns2 _) -> do 
             let pre2 = average pps ps1
             let post2 = average pre2 pps
-            store graph1Table (Just nd1) record1{preL = pre2, postL =post2}
-            if (ns2 > 0) then updateLabel record nd2 record2 ns2 else return()
+            store graph1Table (Just nd2) record2{preL = pre2, postL =post2}
+--            liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
+            if (ns2 > 0) then updateLabel record nd2 record2{preL = pre2, postL =post2} ns2 else return()
             if (fc2 > 0) then 
               do 
                 res3 <- query firstRow (from graph1Table (at fc2)) 
-                updateLabel record2 fc2 res3 (-1) 
+                updateLabel record2{preL = pre2, postL =post2} fc2 res3 (-1) 
               else return()
 
     return()
@@ -354,13 +360,33 @@ handleInsert nd1 nd2 = do
   res2 <- select (from graph1Table (at nd2))
   case (res1,res2) of
 
-    ([record1@(Labels tp1 _ _ hp1 _ fc1 _ _ _ )],[record2@(Labels tp2 _ _ hp2 dir2 _ _ _ _ )])   -- Case 1
+    ([record1@(Labels tp1 _ _ hp1 _ fc1 lc1 _ _ )],[record2@(Labels tp2 _ _ hp2 dir2 _ _ ns2 ls2 )])   -- Case 1
           | tp2 == 0 -> do                                                                       -- Case 1.1
               if Set.null hp1
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)                        -- Case 1.1.1
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)                        -- Case 1.1.2
               update_ graph1Table (return (nd2, record2{tree_parent=nd1{- , nextSibling=fc1 -}}))
-              updateLabel record1 nd2 record2 (-1)
+              liftIO $ print $ " nd :" ++ show nd1 ++ " edges : " ++ show record1
+              liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
+                                   
+
+              if (lc1 <0) then 
+                update_ graph1Table (return (nd1, record1{firstChild = nd2, lastChild= nd2}))>>
+                updateLabel record1 nd2 record2 (-1)
+                else 
+                  do update_ graph1Table (return (nd1, record1{lastChild= nd2}))
+                     record3 <- query firstRow (from graph1Table (at lc1))
+                     update_ graph1Table (return (lc1, record3{nextSibling = nd2}))
+                     update_ graph1Table (return (nd2, record2{lastSibling = lc1}))
+                     updateLabel record1 lc1 record3 nd2
+              if(ls2>0) then 
+                do 
+                  record4 <- query firstRow (from graph1Table (at ls2))
+                  update_ graph1Table (return (ls2, record4{nextSibling = ns2}))
+                  liftIO $ print $ " nd :" ++ show ls2 ++ " edges baabi: " ++ show record4 
+                  return()
+                else return ()
+
               {- TODO: - update the pre and post labels of nd2 and its children.
                           All the labels must be moved right after PreLabel nd1.
                        - update prevSibling for the firstChild of nd1
