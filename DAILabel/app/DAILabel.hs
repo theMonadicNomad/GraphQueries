@@ -174,7 +174,7 @@ main = do
     else
       do  -}     
     insert counters (return ( "l_max", Main.max ))
-    let Graph g = graph11
+    let Graph g = graph2
     let graphmap1 =  Map.fromList g
     process graphmap1
     --store nodeMapTable (Just 0) (X (S "root" ) [])
@@ -230,6 +230,10 @@ processNodes :: GraphMap Node -> Node -> Node -> Daison()
 processNodes graph node parent_node = do
   nd <- getNdIndex node
   parent <- getNdIndex parent_node
+  par <-  query firstRow (from nodeMapTable (at parent))
+  --select [(ind,(nd, edgess)) | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == parent  ] 
+  case par of
+    (X pnd edges) ->  store nodeMapTable (Just parent) (X pnd (List.nub (nd:edges)))
   handleInsert  parent nd
 {-   x <- insertNodeinDB nd parent 
   unless x $ do -}
