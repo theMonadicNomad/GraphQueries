@@ -179,4 +179,27 @@ nextOf (PostLabel node) = case nextSibling node of
 
 
 
-
+(0,TP: 0 Hops: fromList [] Directs:  fromList []FC : 1 LC :  1 NS: -100 PS : -100)
+(1,TP: 0 Hops: fromList [] Directs:  fromList [7,8,9,10,11]FC : 2 LC :  11 NS: -1 PS : -1)
+(2,TP: 1 Hops: fromList [] Directs:  fromList [7,8,9,10]FC : 3 LC :  10 NS: 11 PS : -1)
+(3,TP: 2 Hops: fromList [] Directs:  fromList []FC : 4 LC :  4 NS: 5 PS : -1)
+(4,TP: 3 Hops: fromList [] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : -1)
+(5,TP: 2 Hops: fromList [] Directs:  fromList [7,8,9]FC : 6 LC :  9 NS: 10 PS : 3)
+(6,TP: 5 Hops: fromList [] Directs:  fromList [7,8]FC : 7 LC :  8 NS: 9 PS : -1)
+(7,TP: 6 Hops: fromList [4] Directs:  fromList []FC : -1 LC :  -1 NS: 8 PS : -1)
+(8,TP: 6 Hops: fromList [4] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 7)
+(9,TP: 5 Hops: fromList [4] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 6)
+(10,TP: 2 Hops: fromList [6] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 5)
+(11,TP: 1 Hops: fromList [9] Directs:  fromList []FC : -1 LC :  -1 NS: -1 PS : 2)
+(0,X {nd = S "root", edges = [1]})
+(1,X {nd = C 'a', edges = [11,2]})
+(2,X {nd = C 'b', edges = [10,5,3]})
+(3,X {nd = C 'd', edges = [4]})
+(4,X {nd = C 'k', edges = []})
+(5,X {nd = C 'e', edges = [9,6]})
+(6,X {nd = C 'g', edges = [8,7]})
+(7,X {nd = C 'i', edges = [4]})
+(8,X {nd = C 'j', edges = [4]})
+(9,X {nd = C 'h', edges = [4]})
+(10,X {nd = C 'f', edges = [6]})
+(11,X {nd = C 'c', edges = [9]})

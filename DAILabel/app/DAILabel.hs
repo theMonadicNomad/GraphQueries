@@ -103,8 +103,8 @@ graph2 = Graph
 
 
 instance Show Labels where
-  show (Labels a b c d e f g h i) = "TP: " ++  show a ++  " Pre: " ++ show b ++
-   " Post:  " ++ show c  ++   " Hops: " ++ show d ++ " Directs:  " ++ show e ++
+  show (Labels a b c d e f g h i) = "TP: " ++  show a ++  {- " Pre: " ++ show b ++
+   " Post:  " ++ show c  ++ -}   " Hops: " ++ show d ++ " Directs:  " ++ show e ++
    "FC : " ++ show f ++ " LC :  " ++ show g ++ " NS: " ++ show h ++ " PS : " ++ show i
 
 graph1Table :: Table (Labels)
@@ -225,8 +225,9 @@ processNodes graph node parent_node = do
   parent <- getNdIndex parent_node
   par <-  query firstRow (from nodeMapTable (at parent))
   case par of
-    (X pnd edges) ->  store nodeMapTable (Just parent) (X pnd (List.nub (nd:edges)))
-  handleInsert  parent nd
+    (X pnd edges) -> case (List.elem nd edges ) of
+      True -> return ()
+      False -> handleInsert  parent nd   
   let adjacent = Map.lookup node graph
   case adjacent of
       Nothing      -> return () 
@@ -273,6 +274,7 @@ handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
   res2 <- select (from graph1Table (at nd2))
+  
   case (res1,res2) of
 
     ([record1@(Labels tp1 _ _ hp1 _ fc1 lc1 _ _ )],[record2@(Labels tp2 _ _ hp2 dir2 _ _ ns2 ls2 )])   -- Case 1
@@ -281,8 +283,8 @@ handleInsert nd1 nd2 = do
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)                        -- Case 1.1.1
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)                        -- Case 1.1.2
               update_ graph1Table (return (nd2, record2{tree_parent=nd1{- , nextSibling=fc1 -}}))
-              liftIO $ print $ " nd :" ++ show nd1 ++ " edges : " ++ show record1
-              liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
+              --liftIO $ print $ " nd :" ++ show nd1 ++ " edges : " ++ show record1
+              --liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
                                    
 
               if (lc1 <0) then 
@@ -298,7 +300,7 @@ handleInsert nd1 nd2 = do
                 do 
                   record4 <- query firstRow (from graph1Table (at ls2))
                   update_ graph1Table (return (ls2, record4{nextSibling = ns2}))
-                  liftIO $ print $ " nd :" ++ show ls2 ++ " edges baabi: " ++ show record4 
+                  --liftIO $ print $ " nd :" ++ show ls2 ++ " edges baabi: " ++ show record4 
                   return()
                 else return ()
 
@@ -312,6 +314,9 @@ handleInsert nd1 nd2 = do
                 else do record <- query firstRow (from graph1Table (at tp1))                     -- Case 1.2.2
                         updateDirectInAncestors tp1 record (Set.insert nd1)
                         addHop nd1 record1 nd2
+              liftIO $ print $ " nd1 :" ++ show nd1 ++ " " ++ show record1
+              liftIO $ print $ " nd2 :" ++ show nd2 ++ " " ++ show record2 
+              return ()
 
     ([record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _ )],[]                                          ) ->  -- Case 2
           do (pre,post)  <- do
@@ -376,6 +381,11 @@ handleInsert nd1 nd2 = do
              store graph1Table (Just nd1) (Labels 0   pre1 post1 Set.empty Set.empty nd2  nd2  (-1) prevSib1)
              store graph1Table (Just nd2) (Labels nd1 pre2 post2 Set.empty Set.empty (-1) (-1) (-1) (-1))
              return ()
+  par <-  query firstRow (from nodeMapTable (at nd1))
+  case par of
+    (X pnd edges) ->  store nodeMapTable (Just nd1) (X pnd (nd2:edges))
+  return()
+--  store nodeMapTable (Just parent) (X pnd (List.nub (nd:edges)))
   where 
     average x y = (div x 2) + (div y 2)
     insertIsolatedNode nd1 = do 
