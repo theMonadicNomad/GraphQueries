@@ -173,7 +173,7 @@ main = do
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
     let graphmap1 =  Map.fromList g
-    process1 graphmap1
+    staticProcess graphmap1
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
     return (a,b)
@@ -226,8 +226,8 @@ makeDynamicOperation test_db readwritemode = do
     closeDB db
     makeDynamicOperation test_db readwritemode
 
-process :: GraphMap Node -> Daison ()
-process graphmap = do
+dynamicProcess :: GraphMap Node -> Daison ()
+dynamicProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
   store nodeMapTable (Just 0) (X (S "root" ) [])
   store graph1Table (Just 0) (Labels 0 0 Main.max Set.empty Set.empty (-100) (-100) (-100) (-100) )    
@@ -772,11 +772,11 @@ updateDirects parent gp = do
 
 
 -- Functions related to Static AILabel.
--- replacing process with process1 in the main function initiates static AILabel process.
+-- replacing process in the main function initiates static AILabel process.
 
 
-process1 :: GraphMap Node -> Daison ()
-process1 graphmap = do
+staticProcess :: GraphMap Node -> Daison ()
+staticProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
   processNodes1 graphmap firstnode firstnode
 
