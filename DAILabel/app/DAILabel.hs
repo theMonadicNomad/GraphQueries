@@ -608,10 +608,6 @@ prevOf (PostLabel nd) = do
     [(Labels trp pr ps hp dir fc lc ns ls)] -> if lc >0 then  return (PostLabel lc)  
       else return (PreLabel nd)
 
-getEdges :: Nd -> Daison [Nd]
-getEdges nd = do 
-  record <- select [ edgs| ( X n edgs) <- from nodeMapTable (at nd)  ] 
-  return . head $ record
 
 deleteDirectsandAncestors :: Nd -> Nd -> Daison()
 deleteDirectsandAncestors nd1 nd2 = do
@@ -639,18 +635,6 @@ updateDirectInAncestors nd (Labels tp pr ps hp dir fc lc ns ls) f = do
     record <- query firstRow (from graph1Table (at tp))
     updateDirectInAncestors tp record f
 
-updatePre :: Nd -> [Nd] -> Daison Bool
-updatePre nd visited = do 
-  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
-  case record of 
-    [(nd, Labels trp pr ps hp dir fc lc ns ls  )] -> if pr == ps || elem nd visited then return True
-                                           else   
-                                             do
-                                               c_counter <- getCounter
-                                               incrementCounter
-                                               update_ graph1Table (return (nd, Labels trp c_counter c_counter hp dir fc lc ns ls ))
-                                               return False
-    _ -> error "error " 
 
 isTreeEdge :: Nd -> Nd -> Daison Bool
 isTreeEdge nd1 nd2 = do
@@ -681,19 +665,6 @@ isTheOnlyNonTreeEdge nd1 nd2 = do
         else 
           error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
     _ -> error " couldnt find record from isonlynontreeedge "
-
-
-updatePost :: Nd -> Daison ()
-updatePost nd = do 
-  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels trp pr ps hp dir fc lc ns ls ->  do 
-        c_counter <- getCounter
-        incrementCounter
-        update_ graph1Table (return (nd, Labels trp pr c_counter hp dir fc lc ns ls ))
-      _   -> error "error from updatepost"
-    _ -> error "error " 
 
 
 getParent :: Nd -> Daison Nd
@@ -781,6 +752,10 @@ relabel nd visited =  do
          return (nd : nv)
  -}
  
+getEdges :: Nd -> Daison [Nd]
+getEdges nd = do 
+  record <- select [ edgs| ( X n edgs) <- from nodeMapTable (at nd)  ] 
+  return . head $ record
 
 updateDirects :: Nd -> Nd -> Daison()
 updateDirects parent gp = do
@@ -794,6 +769,11 @@ updateDirects parent gp = do
   when (gp > 1) $ do
     ggp <- getParent gp
     when (ggp > 1) $ updateDirects parent ggp
+
+
+-- Functions related to Static AILabel.
+-- replacing process with process1 in the main function initiates static AILabel process.
+
 
 process1 :: GraphMap Node -> Daison ()
 process1 graphmap = do
@@ -890,6 +870,31 @@ insertNodeinDB node parent  = do
   where
     average x y = (div x 2) + (div y 2)
 
+updatePre :: Nd -> [Nd] -> Daison Bool
+updatePre nd visited = do 
+  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
+  case record of 
+    [(nd, Labels trp pr ps hp dir fc lc ns ls  )] -> if pr == ps || elem nd visited then return True
+                                           else   
+                                             do
+                                               c_counter <- getCounter
+                                               incrementCounter
+                                               update_ graph1Table (return (nd, Labels trp c_counter c_counter hp dir fc lc ns ls ))
+                                               return False
+    _ -> error "error " 
+
+
+updatePost :: Nd -> Daison ()
+updatePost nd = do 
+  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
+  case record of 
+    [(nd, label)] -> case label of
+      Labels trp pr ps hp dir fc lc ns ls ->  do 
+        c_counter <- getCounter
+        incrementCounter
+        update_ graph1Table (return (nd, Labels trp pr c_counter hp dir fc lc ns ls ))
+      _   -> error "error from updatepost"
+    _ -> error "error " 
 
 
 updateSiblings :: Nd -> Nd -> Nd -> Daison ()
@@ -897,10 +902,3 @@ updateSiblings left nd right = do
   record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
   case record of
     [(Labels trp pr ps hp dir fc lc ns ls)] -> update_ graph1Table (return (nd, Labels trp pr ps hp dir fc lc right left ))
-
-
-
-
-
-
- 
