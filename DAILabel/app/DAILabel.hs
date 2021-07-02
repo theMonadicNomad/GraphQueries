@@ -135,8 +135,11 @@ graph3 = Graph
     (I 29, [I 30]),
     (I 30, [I 31]),
     (I 31, [I 32]),    
-    (I 32, [I 33])
-        
+    (I 32, [I 33]),
+    (I 33, [I 34]),
+    (I 34, [I 35]),    
+    (I 35, [I 36]),
+    (I 36, [])        
   ]
 
 
@@ -368,14 +371,25 @@ handleInsert nd1 nd2 = do
               return ()
 
     ([record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _ )],[]                                          ) ->  -- Case 2
-          do when ((ps1 - pr1) ==2 ) $ return ()--reLabelMain (PreLabel pr1)
+          do --when ((ps1 - pr1) <=2 ) $ reLabelMain (PreLabel nd1)
           
-             (pre,post)  <- do
-                a <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
-                let pr = average a ps1
-                let ps = average pr ps1
-                liftIO $ print $ " nd1 : " ++ show nd1 ++ " nd2 : " ++ show nd2++ " pr :" ++ show pr ++ " ps : " ++ show ps 
-                return (pr,ps)
+             (pre,post)  <- if ((ps1 - pr1) <=2 ) 
+
+               then
+                 do
+                   reLabelMain (PreLabel nd1)
+                   a  <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
+                   ps1 <- getLabel (PostLabel nd1)
+                   let pr = average a ps1
+                   let ps = average pr ps1
+                   return (pr,ps)
+
+               else do 
+                 a <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
+                 let pr = average a ps1
+                 let ps = average pr ps1
+--                liftIO $ print $ " nd1 : " ++ show nd1 ++ " nd2 : " ++ show nd2++ " pr :" ++ show pr ++ " ps : " ++ show ps 
+                 return (pr,ps)
 
              (new_fc1, new_lc1, ns2, ls2) <- if lc1 < 0 
                then return (nd2,nd2,(-1),(-1)) 
@@ -531,12 +545,16 @@ reLabelMain v  {- (PreLabel nd) -} =  do
   let count = 2
   (newd, newcount,newv, begin, end) <- mainLoop d count v v v --(PreLabel nd) (PreLabel nd) (PreLabel nd)
   reLabelRange begin end newv newd newcount
+  
+  x <- select [ x | x <- from graph1Table everything ] 
+  liftIO $  print "from relabelMain"
+  liftIO $  mapM_ (\y -> putStrLn (show y) ) x
   return ()
 
 mainLoop :: Int64 -> Int64-> PrePostRef ->PrePostRef -> PrePostRef -> Daison (Nd, Int64, PrePostRef, PrePostRef, PrePostRef)
 mainLoop d count v begin end = do
   --max <- getCounter
-  liftIO $ print $ " mainloop :" ++ show d ++ "  : " ++ show Main.max
+  liftIO $ print $ " mainloop v :" ++ show v ++ "  : " ++ show begin
   if (d <  Main.max) then 
     do 
       (begin1, count1, v1, d1)  <- goPrev (begin) count v d
@@ -554,8 +572,9 @@ goPrev :: PrePostRef -> Int64 -> PrePostRef -> Int64 -> Daison (PrePostRef, Int6
 goPrev begin count v d = do 
   vlabel <- getLabel v
   newbegin <- prevOf begin 
+--  liftIO $ print $ " go new begin :" ++ show newbegin ++ " v : " ++ show v
   newbeginLabel <- getLabel (newbegin)
-  liftIO $ print $ " goPrev :" ++ show newbeginLabel ++ "  : " ++ show (vlabel Bits..&. (Bits.complement d))
+--  liftIO $ print $ " goPrev :" ++ show newbeginLabel ++ "  : " ++ show (vlabel Bits..&. (Bits.complement d))
   if (newbeginLabel > (vlabel Bits..&. (Bits.complement d))) then 
     goPrev newbegin (count +1) v d
   else return (begin, count, v, d)
@@ -582,7 +601,24 @@ reLabelRange begin end v d count = do
 
 
 reLabelNodes begin end v n i = do 
-  if begin == end then 
+  if begin == end then do
+    liftIO $ print $ " relabelNodes :" ++ show begin ++ "  : " ++ show end ++ ":  " ++ show i
+    case begin of 
+      (PreLabel nd ) ->   do
+        record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
+        case record of
+          [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
+            let newlabel = v + i * n
+            update_ graph1Table (return (nd, Labels tp newlabel ps  hp dir fc lc ns ls) )
+            return()
+      (PostLabel nd ) ->   do
+        record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
+        case record of
+          [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
+            let newlabel = v + i * n
+            update_ graph1Table (return (nd, Labels tp pr newlabel   hp dir fc lc ns ls) )
+            return()
+
     return ()
   else do 
     liftIO $ print $ " relabelNodes :" ++ show begin ++ "  : " ++ show end ++ ":  " ++ show i
@@ -610,6 +646,7 @@ reLabelNodes begin end v n i = do
 
 getLabel :: PrePostRef -> Daison Nd
 getLabel (PreLabel nd) = do 
+--  liftIO $ print $ " getprelabel : " ++show nd
   record <- select [label1 | (label1) <- from graph1Table (at nd)  ]
   case record of
     [(Labels trp pr ps hp dir fc lc ns ls)] -> return pr
