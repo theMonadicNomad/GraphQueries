@@ -182,6 +182,20 @@ main = do
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
+getNdIndex node = do
+  nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
+  case nod of
+    [nd] -> return nd
+    []   -> do 
+{-       c_counter <- getCounter
+      incrementCounter >> incrementCounter -}
+      pkey <- insert_ nodeMapTable (X node [])
+--      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
+      return pkey
+    _    -> error $ "ivalid getindex nd :" ++ show nod
+
+
+
 makeDynamicOperation :: String -> AccessMode -> IO()
 makeDynamicOperation test_db readwritemode = do
     IO.hSetBuffering IO.stdin IO.NoBuffering
@@ -217,7 +231,6 @@ process graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
   store nodeMapTable (Just 0) (X (S "root" ) [])
   store graph1Table (Just 0) (Labels 0 0 Main.max Set.empty Set.empty (-100) (-100) (-100) (-100) )    
-  let values = snd $ Map.elemAt 0 graphmap
   processNodes graphmap firstnode (S "root")
 
 
@@ -670,18 +683,6 @@ isTheOnlyNonTreeEdge nd1 nd2 = do
     _ -> error " couldnt find record from isonlynontreeedge "
 
 
-getNdIndex node = do
-  nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
-  case nod of
-    [nd] -> return nd
-    []   -> do 
-{-       c_counter <- getCounter
-      incrementCounter >> incrementCounter -}
-      pkey <- insert_ nodeMapTable (X node [])
---      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
-      return pkey
-    _    -> error $ "ivalid getindex nd :" ++ show nod
-
 updatePost :: Nd -> Daison ()
 updatePost nd = do 
   record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
@@ -765,8 +766,6 @@ dfsearch nd1 nd2 = do
       True -> return True
       False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
 
-
-
 {- relabel :: Nd -> [Nd] -> Daison [Nd]
 relabel nd visited =  do 
 --  liftIO $ print $ (" relabel, nd : ") ++ show nd ++ "  visited : " ++ show visited
@@ -799,13 +798,7 @@ updateDirects parent gp = do
 process1 :: GraphMap Node -> Daison ()
 process1 graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
-{-   store nodeMapTable (Just 0) (X (S "root" ) [])
-  store graph1Table (Just 0) (Labels 0 0 Main.max Set.empty Set.empty (-100) (-100) (-100) (-100) )     -}
-  let values = snd $ Map.elemAt 0 graphmap
-  processNodes1 graphmap firstnode firstnode -- (S "root")
-
-
-
+  processNodes1 graphmap firstnode firstnode
 
 processNodes1 :: GraphMap Node -> Node -> Node -> Daison()
 processNodes1 graph nd parent = do
