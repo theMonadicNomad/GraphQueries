@@ -173,7 +173,7 @@ main = do
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
     let graphmap1 =  Map.fromList g
-    process graphmap1
+    process1 graphmap1
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
     return (a,b)
@@ -187,10 +187,10 @@ getNdIndex node = do
   case nod of
     [nd] -> return nd
     []   -> do 
-{-       c_counter <- getCounter
-      incrementCounter >> incrementCounter -}
+      c_counter <- getCounter
+      incrementCounter >> incrementCounter 
       pkey <- insert_ nodeMapTable (X node [])
---      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
+      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
@@ -766,9 +766,9 @@ updateDirects parent gp = do
         update_ graph1Table (return (nd, Labels trp pr ps hp (Set.insert parent dir) fc lc ns ls ))
       _ -> error "updatedirects error"
     _   -> liftIO $ print record
-  when (gp > 1) $ do
+  when (gp > 0) $ do
     ggp <- getParent gp
-    when (ggp > 1) $ updateDirects parent ggp
+    when (ggp > 0) $ updateDirects parent ggp
 
 
 -- Functions related to Static AILabel.
@@ -848,7 +848,7 @@ insertNodeinDB node parent  = do
       pkey <-  insert_ nodeMapTable (X node [])
       store graph1Table (Just pkey) (Labels parent_ndmp (c_counter) (c_counter)  Set.empty Set.empty (-100) (-100) (-100) (-100) )    
       
-      when (parent_ndmp > 1) $ do
+      when (parent_ndmp > 0) $ do
 --        parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
 --        case parent_record of
 --          [(indp ,(Labels ptrp ppr pps php pdir pte))] -> update_ graph1Table (return (indp,(Labels ptrp ppr pps php pdir (pkey:pte)) ))
@@ -863,7 +863,7 @@ insertNodeinDB node parent  = do
           [(indp, labelp)] -> case labelp of 
             (Labels ptrp ppr pps php pdir fc lc ns ls) -> do
               update_ graph1Table (return (indp,(Labels ptrp ppr pps (Set.insert (head map) php ) pdir fc lc ns ls ) ))
-              when (ptrp > 1) $ updateDirects parent_ndmp ptrp 
+              when (ptrp > 0) $ updateDirects parent_ndmp ptrp 
       update_ nodeMapTable  (return (parent_ndmp, (X (parent_ndc) (nod:edges_par) ) ))
 
       return True 
