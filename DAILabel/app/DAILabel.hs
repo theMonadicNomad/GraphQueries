@@ -215,10 +215,10 @@ makeDynamicOperation test_db readwritemode = do
 process :: GraphMap Node -> Daison ()
 process graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
-{-   store nodeMapTable (Just 0) (X (S "root" ) [])
-  store graph1Table (Just 0) (Labels 0 0 Main.max Set.empty Set.empty (-100) (-100) (-100) (-100) )     -}
+  store nodeMapTable (Just 0) (X (S "root" ) [])
+  store graph1Table (Just 0) (Labels 0 0 Main.max Set.empty Set.empty (-100) (-100) (-100) (-100) )    
   let values = snd $ Map.elemAt 0 graphmap
-  processNodes1 graphmap firstnode firstnode -- (S "root")
+  processNodes graphmap firstnode (S "root")
 
 
 processNodes :: GraphMap Node -> Node -> Node -> Daison()
@@ -478,21 +478,6 @@ removeTreeParent nd1 = do
       update_ graph1Table (return (nd, Labels 0 pr ps hp dir fc lc ns ls) )
     
 
-relabel :: Nd -> [Nd] -> Daison [Nd]
-relabel nd visited =  do 
---  liftIO $ print $ (" relabel, nd : ") ++ show nd ++ "  visited : " ++ show visited
-  x <- updatePre nd visited
-  if x then return visited
-       else do
-         edges <- getEdges nd 
---         liftIO $ print $ " nd :" ++ show nd ++ " edges : " ++ show edges
-         nv <- case edges of
-           [] -> return visited
-           rest -> foldM (\acc y -> relabel y acc) visited  rest
-         updatePost nd 
-         return (nd : nv)
-
-
 reLabelMain :: PrePostRef -> Daison ()
 reLabelMain v  {- (PreLabel nd) -} =  do 
   let d = 3
@@ -524,7 +509,6 @@ goPrev begin count v d = do
   newbegin <- prevOf begin 
   newbeginLabel <- getLabel (newbegin)
   liftIO $ print $ " goPrev :" ++ show newbeginLabel ++ "  : " ++ show (vlabel Bits..&. (Bits.complement d))
-
   if (newbeginLabel > (vlabel Bits..&. (Bits.complement d))) then 
     goPrev newbegin (count +1) v d
   else return (begin, count, v, d)
@@ -536,19 +520,16 @@ goNext end count v d = do
   newend <- nextOf end
   newendLabel <- getLabel (newend)  
   liftIO $ print $ " goNext :" ++ show newendLabel ++ "  : " ++ show (vlabel Bits..|. d)
-
   if (newendLabel < (vlabel Bits..|. d)) then 
     goNext newend (count +1) v d
   else return (end, count, v, d)
 
 reLabelRange :: PrePostRef -> PrePostRef -> PrePostRef -> Int64 ->Int64 -> Daison()
 reLabelRange begin end v d count = do 
-
   let n = div d count
   vlabel <- getLabel v
   let newv = vlabel  Bits..&. (Bits.complement d )
   liftIO $ print $ " relabelRange :" ++ show begin ++ "  : " ++ show end
-
   reLabelNodes begin end newv n 0
   return ()
 
@@ -694,10 +675,10 @@ getNdIndex node = do
   case nod of
     [nd] -> return nd
     []   -> do 
-      c_counter <- getCounter
-      incrementCounter >> incrementCounter
+{-       c_counter <- getCounter
+      incrementCounter >> incrementCounter -}
       pkey <- insert_ nodeMapTable (X node [])
-      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
+--      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
@@ -786,7 +767,20 @@ dfsearch nd1 nd2 = do
 
 
 
-
+{- relabel :: Nd -> [Nd] -> Daison [Nd]
+relabel nd visited =  do 
+--  liftIO $ print $ (" relabel, nd : ") ++ show nd ++ "  visited : " ++ show visited
+  x <- updatePre nd visited
+  if x then return visited
+       else do
+         edges <- getEdges nd 
+--         liftIO $ print $ " nd :" ++ show nd ++ " edges : " ++ show edges
+         nv <- case edges of
+           [] -> return visited
+           rest -> foldM (\acc y -> relabel y acc) visited  rest
+         updatePost nd 
+         return (nd : nv)
+ -}
  
 
 updateDirects :: Nd -> Nd -> Daison()
@@ -801,6 +795,17 @@ updateDirects parent gp = do
   when (gp > 1) $ do
     ggp <- getParent gp
     when (ggp > 1) $ updateDirects parent ggp
+
+process1 :: GraphMap Node -> Daison ()
+process1 graphmap = do
+  let firstnode = fst $ Map.elemAt 0 graphmap
+{-   store nodeMapTable (Just 0) (X (S "root" ) [])
+  store graph1Table (Just 0) (Labels 0 0 Main.max Set.empty Set.empty (-100) (-100) (-100) (-100) )     -}
+  let values = snd $ Map.elemAt 0 graphmap
+  processNodes1 graphmap firstnode firstnode -- (S "root")
+
+
+
 
 processNodes1 :: GraphMap Node -> Node -> Node -> Daison()
 processNodes1 graph nd parent = do
