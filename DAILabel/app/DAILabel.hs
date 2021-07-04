@@ -138,8 +138,13 @@ graph3 = Graph
     (I 32, [I 33]),
     (I 33, [I 34]),
     (I 34, [I 35]),    
-    (I 35, [I 36]),
-    (I 36, [])        
+    (I 35, [])
+ {-   (I 36, [I 37]),     
+    (I 37, [I 38]),
+    (I 38, [I 39]),    
+    (I 39, [I 40]),
+    (I 40, [])        
+ -}   
   ]
 
 
@@ -218,6 +223,7 @@ main = do
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
     return (a,b)
+  putStrLn "FROM MAIN"
   mapM_ (\y -> putStrLn (show y) ) a
 --  mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
@@ -262,6 +268,7 @@ makeDynamicOperation test_db readwritemode = do
       x <- select [ x | x <- from graph1Table everything ] 
       y <- select [ x | x <- from nodeMapTable everything ]
       return (x,y)
+    putStrLn "from make dynamic" 
     mapM_ (\y -> putStrLn (show y) ) a
 --    mapM_ (\y -> putStrLn (show y) ) b
     closeDB db
@@ -372,34 +379,46 @@ handleInsert nd1 nd2 = do
 
     ([record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _ )],[]                                          ) ->  -- Case 2
           do --when ((ps1 - pr1) <=2 ) $ reLabelMain (PreLabel nd1)
-          
-             (pre,post)  <- if ((ps1 - pr1) <=2 ) 
+             liftIO $ print $ " nd1 : " ++ show nd1 ++ " nd2 : " ++ show nd2++ " pr :" ++ show pr1 ++ " ps : " ++ show ps1 
+
+             (pre,post,ns2,ls2)  <- if ((ps1 - pr1) <=1 ) 
 
                then
                  do
                    reLabelMain (PreLabel nd1)
                    a  <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
                    ps1 <- getLabel (PostLabel nd1)
+                   liftIO $ print $ " FROM IF a : " ++ show a ++ " ps1 : " ++ show ps1
+
                    let pr = average a ps1
                    let ps = average pr ps1
-                   return (pr,ps)
+                   (new_fc1, new_lc1, ns2, ls2) <- if lc1 < 0 
+                     then return (nd2,nd2,(-1),(-1)) 
+                     else do res3 <- query firstRow (from graph1Table (at lc1))
+                             case res3 of 
+                              record3@(Labels _ _ _ _ _ _  _ ns _) -> store graph1Table (Just lc1) record3{nextSibling = nd2}
+                             return (fc1, nd2,(-1), lc1 )
+                   newRes1 <- query firstRow (from graph1Table (at nd1))
+                   case newRes1 of 
+                    newRecord1@(Labels _ _ _ _ _ _  _ _ _) ->store graph1Table (Just nd1) newRecord1{firstChild = new_fc1,lastChild = new_lc1}
+                   return (pr,ps,ns2,ls2)
 
                else do 
                  a <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
                  let pr = average a ps1
                  let ps = average pr ps1
---                liftIO $ print $ " nd1 : " ++ show nd1 ++ " nd2 : " ++ show nd2++ " pr :" ++ show pr ++ " ps : " ++ show ps 
-                 return (pr,ps)
+                 liftIO $ print $ " FROM ELSE a : " ++ show a ++ " ps1 : " ++ show ps1
+                 (new_fc1, new_lc1, ns2, ls2) <- if lc1 < 0 
+                   then return (nd2,nd2,(-1),(-1)) 
+                   else do res3 <- query firstRow (from graph1Table (at lc1))
+                           case res3 of 
+                            record3@(Labels _ _ _ _ _ _  _ ns _) -> store graph1Table (Just lc1) record3{nextSibling = nd2}
+                           return (fc1, nd2,(-1), lc1 )
+            
+                 store graph1Table (Just nd1) record1{firstChild = new_fc1,lastChild = new_lc1}
 
-             (new_fc1, new_lc1, ns2, ls2) <- if lc1 < 0 
-               then return (nd2,nd2,(-1),(-1)) 
-               else do res3 <- query firstRow (from graph1Table (at lc1))
-                       case res3 of 
-                        record3@(Labels _ _ _ _ _ _  _ ns _) -> store graph1Table (Just lc1) record3{nextSibling = nd2}
+                 return (pr,ps,ns2,ls2)
 
-                       return (fc1, nd2,(-1), lc1 )
-
-             store graph1Table (Just nd1) record1{firstChild = new_fc1,lastChild = new_lc1}
 
              store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty (-1) (-1) ns2 {- fc1 -} ls2)
              {- TODO: - update prevSibling for the firstChild of nd1 ??
@@ -554,7 +573,7 @@ reLabelMain v  {- (PreLabel nd) -} =  do
 mainLoop :: Int64 -> Int64-> PrePostRef ->PrePostRef -> PrePostRef -> Daison (Nd, Int64, PrePostRef, PrePostRef, PrePostRef)
 mainLoop d count v begin end = do
   --max <- getCounter
-  liftIO $ print $ " mainloop v :" ++ show v ++ "  : " ++ show begin
+--  liftIO $ print $ " mainloop v :" ++ show v ++ "  : " ++ show begin
   if (d <  Main.max) then 
     do 
       (begin1, count1, v1, d1)  <- goPrev (begin) count v d
@@ -585,7 +604,7 @@ goNext end count v d = do
   vlabel <- getLabel v
   newend <- nextOf end
   newendLabel <- getLabel (newend)  
-  liftIO $ print $ " goNext :" ++ show newendLabel ++ "  : " ++ show (vlabel Bits..|. d)
+--  liftIO $ print $ " goNext :" ++ show newendLabel ++ "  : " ++ show (vlabel Bits..|. d)
   if (newendLabel < (vlabel Bits..|. d)) then 
     goNext newend (count +1) v d
   else return (end, count, v, d)
@@ -602,7 +621,7 @@ reLabelRange begin end v d count = do
 
 reLabelNodes begin end v n i = do 
   if begin == end then do
-    liftIO $ print $ " relabelNodes :" ++ show begin ++ "  : " ++ show end ++ ":  " ++ show i
+--    liftIO $ print $ " relabelNodes :" ++ show begin ++ "  : " ++ show end ++ ":  " ++ show i
     case begin of 
       (PreLabel nd ) ->   do
         record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
@@ -621,7 +640,7 @@ reLabelNodes begin end v n i = do
 
     return ()
   else do 
-    liftIO $ print $ " relabelNodes :" ++ show begin ++ "  : " ++ show end ++ ":  " ++ show i
+--    liftIO $ print $ " relabelNodes :" ++ show begin ++ "  : " ++ show end ++ ":  " ++ show i
     case begin of 
       (PreLabel nd ) ->   do
         record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
@@ -638,8 +657,8 @@ reLabelNodes begin end v n i = do
             update_ graph1Table (return (nd, Labels tp pr newlabel   hp dir fc lc ns ls) )
             return()
     newbegin <- nextOf (begin)
-    liftIO $ print $ " begin : " ++show begin ++ " newbegin : " ++ show newbegin
-    liftIO $ print $ " I : " ++show i ++ " n  : " ++ show n
+--    liftIO $ print $ " begin : " ++show begin ++ " newbegin : " ++ show newbegin
+--    liftIO $ print $ " I : " ++show i ++ " n  : " ++ show n
 
     reLabelNodes newbegin end v n (i +1)
 
