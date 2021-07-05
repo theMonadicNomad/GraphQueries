@@ -138,13 +138,30 @@ graph3 = Graph
     (I 32, [I 33]),
     (I 33, [I 34]),
     (I 34, [I 35]),    
-    (I 35, [])
- {-   (I 36, [I 37]),     
+    (I 35, [I 36]),
+    (I 36, [I 37]),     
     (I 37, [I 38]),
     (I 38, [I 39]),    
     (I 39, [I 40]),
-    (I 40, [])        
- -}   
+    (I 40, [I 41]),        
+    (I 41, [I 42]),        
+    (I 42, [I 43]),        
+    (I 43, [I 44]),        
+    (I 44, [I 45]),        
+    (I 45, [I 46]),        
+    (I 46, [I 47]),        
+    (I 47, [I 48]),        
+    (I 48, [I 49]),        
+    (I 49, [I 50]),        
+    (I 50, [I 51]),
+    (I 51, [I 52]),
+    (I 52, [I 53]),
+    (I 53, [I 54]),
+    (I 54, [I 55]),
+    (I 55, [])
+
+    
+    
   ]
 
 
@@ -381,7 +398,7 @@ handleInsert nd1 nd2 = do
           do --when ((ps1 - pr1) <=2 ) $ reLabelMain (PreLabel nd1)
              liftIO $ print $ " nd1 : " ++ show nd1 ++ " nd2 : " ++ show nd2++ " pr :" ++ show pr1 ++ " ps : " ++ show ps1 
 
-             (pre,post,ns2,ls2)  <- if ((ps1 - pr1) <=1 ) 
+             (pre,post,ns2,ls2)  <- if ((ps1 - pr1) <=2 ) 
 
                then
                  do
@@ -615,7 +632,7 @@ reLabelRange begin end v d count = do
   vlabel <- getLabel v
   let newv = vlabel  Bits..&. (Bits.complement d )
   liftIO $ print $ " relabelRange :" ++ show begin ++ "  : " ++ show end
-  reLabelNodes begin end newv n 0
+  reLabelNodes begin end newv n 1
   return ()
 
 
