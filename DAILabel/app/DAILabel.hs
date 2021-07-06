@@ -227,6 +227,15 @@ isAlphabet ch = if ch `elem` ['a'..'z'] || ch `elem` ['A'..'Z']
 
 main :: IO ()
 main = do
+  IO.hSetBuffering IO.stdin IO.NoBuffering
+  putStrLn ("Enter the number of nodes : ")
+  inp_1 <- getLine
+  putStrLn (" Enter the density : ")
+  inp_2 <- getLine
+  let n = (read inp_1 :: Int64)
+  let d = (read inp_2 :: Double)
+  let Graph g1 = generateGraph n d
+  print $ show g1
   db <- openDB databaseTest
   (a,b)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
@@ -245,6 +254,11 @@ main = do
 --  mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
+
+generateGraph :: Int64 -> Double ->Graph Node
+generateGraph n p =  Graph $ map (\x -> (I x, [])) [1..n]
+
+
 
 getNdIndex node = do
   nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
