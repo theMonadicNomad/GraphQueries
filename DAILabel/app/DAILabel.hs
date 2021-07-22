@@ -257,17 +257,10 @@ main = do
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
-{- generateGraph :: Int64 -> Double ->Graph Node
-generateGraph n p =  Graph $ map (\x -> (I x, [])) [1..n]
- -}
-
-
-
 generateGraph :: Int64 -> Double ->Graph Node
 generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
     where 
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
-
 
 
 getNdIndex node = do
