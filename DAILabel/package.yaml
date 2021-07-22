@@ -15,6 +15,7 @@ library:
     - syb
     - bytestring
     - containers
+    - random
   include-dirs: src/c
 
     
@@ -40,3 +41,4 @@ executables:
       - ghc-prim
       - QuickCheck
       - process
+      - random

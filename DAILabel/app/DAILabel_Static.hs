@@ -131,6 +131,7 @@ graph2 = Graph
       ( 'k', [] )
     ]
 
+
 instance Show Labels where
   show (Labels a b c d e) = "TP: " ++  show a ++ " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e 
 
