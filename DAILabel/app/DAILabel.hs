@@ -167,9 +167,9 @@ graph3 = Graph
 
 instance Show Labels where
   show (Labels a b c d e f g h i) = "TP: " ++  show a ++   " Pre: " ++ show b ++
-   " Post:  " ++ show c  {- ++   " Hops: " ++ show d ++ " Directs:  " ++ show e ++
+   " Post:  " ++ show c   ++   " Hops: " ++ show d ++ " Directs:  " ++ show e ++
    "FC : " ++ show f ++ " LC :  " ++ show g ++ " NS: " ++ show h ++ " PS : " ++ show i
- -}
+ 
 graph1Table :: Table (Labels)
 graph1Table = table "graph1"
             `withIndex` graph_index
@@ -232,6 +232,8 @@ main = do
   inp_1 <- getLine
   putStrLn (" Enter the density : ")
   inp_2 <- getLine
+  putStrLn ("Enter your choice : (s) for staticProcess, (d) for dynamicProcess: ")
+  process_char <- getChar
   let n = (read inp_1 :: Int64)
   let d = (read inp_2 :: Double)
   let Graph g1 = generateGraph n d
@@ -243,15 +245,15 @@ main = do
     tryCreateTable nodeMapTable
 --    insert counters (return ( "l_max", Main.max ))
     insert counters (return ( "counter", 0 ))
-    let Graph g = graph3
-    let graphmap1 =  Map.fromList g
-    dynamicProcess graphmap1
+    let Graph g = graph2
+    let graphmap1 =  Map.fromList g1
+    if (process_char == 'd') then dynamicProcess graphmap1 else staticProcess graphmap1
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
     return (a,b)
   putStrLn "FROM MAIN"
   mapM_ (\y -> putStrLn (show y) ) a
---  mapM_ (\y -> putStrLn (show y) ) b
+  mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
@@ -412,13 +414,13 @@ handleInsert nd1 nd2 = do
                 else do record <- query firstRow (from graph1Table (at tp1))                     -- Case 1.2.2
                         updateDirectInAncestors tp1 record (Set.insert nd1)
                         addHop nd1 record1 nd2
-              liftIO $ print $ " nd1 :" ++ show nd1 ++ " " ++ show record1
-              liftIO $ print $ " nd2 :" ++ show nd2 ++ " " ++ show record2 
+--              liftIO $ print $ " nd1 :" ++ show nd1 ++ " " ++ show record1
+--              liftIO $ print $ " nd2 :" ++ show nd2 ++ " " ++ show record2 
               return ()
 
     ([record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _ )],[]                                          ) ->  -- Case 2
           do --when ((ps1 - pr1) <=2 ) $ reLabelMain (PreLabel nd1)
-             liftIO $ print $ " nd1 : " ++ show nd1 ++ " nd2 : " ++ show nd2++ " pr :" ++ show pr1 ++ " ps : " ++ show ps1 
+--             liftIO $ print $ " nd1 : " ++ show nd1 ++ " nd2 : " ++ show nd2++ " pr :" ++ show pr1 ++ " ps : " ++ show ps1 
 
              (pre,post,ns2,ls2)  <- if ((ps1 - pr1) <=2 ) 
 
@@ -427,7 +429,7 @@ handleInsert nd1 nd2 = do
                    reLabelMain (PreLabel nd1)
                    a  <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
                    ps1 <- getLabel (PostLabel nd1)
-                   liftIO $ print $ " FROM IF a : " ++ show a ++ " ps1 : " ++ show ps1
+--                   liftIO $ print $ " FROM IF a : " ++ show a ++ " ps1 : " ++ show ps1
 
                    let pr = average a ps1
                    let ps = average pr ps1
@@ -446,7 +448,7 @@ handleInsert nd1 nd2 = do
                  a <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
                  let pr = average a ps1
                  let ps = average pr ps1
-                 liftIO $ print $ " FROM ELSE a : " ++ show a ++ " ps1 : " ++ show ps1
+--                 liftIO $ print $ " FROM ELSE a : " ++ show a ++ " ps1 : " ++ show ps1
                  (new_fc1, new_lc1, ns2, ls2) <- if lc1 < 0 
                    then return (nd2,nd2,(-1),(-1)) 
                    else do res3 <- query firstRow (from graph1Table (at lc1))
@@ -605,8 +607,8 @@ reLabelMain v  {- (PreLabel nd) -} =  do
   reLabelRange begin end newv newd newcount
   
   x <- select [ x | x <- from graph1Table everything ] 
-  liftIO $  print "from relabelMain"
-  liftIO $  mapM_ (\y -> putStrLn (show y) ) x
+--  liftIO $  print "from relabelMain"
+--  liftIO $  mapM_ (\y -> putStrLn (show y) ) x
   return ()
 
 mainLoop :: Int64 -> Int64-> PrePostRef ->PrePostRef -> PrePostRef -> Daison (Nd, Int64, PrePostRef, PrePostRef, PrePostRef)
@@ -653,7 +655,7 @@ reLabelRange begin end v d count = do
   let n = div d count
   vlabel <- getLabel v
   let newv = vlabel  Bits..&. (Bits.complement d )
-  liftIO $ print $ " relabelRange :" ++ show begin ++ "  : " ++ show end
+--  liftIO $ print $ " relabelRange :" ++ show begin ++ "  : " ++ show end
   reLabelNodes begin end newv n 1
   return ()
 
@@ -952,7 +954,18 @@ processNodes1 graph nd parent = do
                   last_child <- getNdIndex (last rest) >>= \lc -> if nd > lc then return (-1) else return lc
                   update_ graph1Table (return (nd, Labels trp pr ps hp dir first_child last_child ns ls ))
     getNdIndex nd >>= \nd1 -> updatePost nd1
-
+  where 
+    getNdIndex node = do
+      nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
+      case nod of
+        [nd] -> return nd
+        []   -> do 
+          c_counter <- getCounter
+          incrementCounter >> incrementCounter  
+          pkey <- insert_ nodeMapTable (X node [])
+          store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
+          return pkey
+        _    -> error $ "ivalid getindex nd :" ++ show nod
 
 
 
