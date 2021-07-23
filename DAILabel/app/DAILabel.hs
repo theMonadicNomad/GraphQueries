@@ -899,10 +899,25 @@ updateDirects parent gp = do
 -- replacing process in the main function initiates static AILabel process.
 
 
+processRemainingNodes :: GraphMap Node -> Daison ()
+processRemainingNodes graphmap = do 
+  nodes <- select [nd | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
+  let graphlist = Map.toList graphmap
+  let nodelist = map (\(x,y) -> x ) graphlist
+  let difference = nodelist List.\\ nodes
+  liftIO $ print $ " nodes :  " ++ show nodes
+  liftIO $ print $ " difference : " ++ show difference
+  liftIO $ print $ " nodelist : " ++ show nodelist
+  when (length difference > 0 ) $ do 
+    processNodes1 graphmap (head difference) (head difference)
+    processRemainingNodes graphmap
+  return()
+
 staticProcess :: GraphMap Node -> Daison ()
 staticProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
   processNodes1 graphmap firstnode firstnode
+  processRemainingNodes graphmap
 
 processNodes1 :: GraphMap Node -> Node -> Node -> Daison()
 processNodes1 graph nd parent = do
