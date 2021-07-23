@@ -257,17 +257,10 @@ main = do
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
-{- generateGraph :: Int64 -> Double ->Graph Node
-generateGraph n p =  Graph $ map (\x -> (I x, [])) [1..n]
- -}
-
-
-
 generateGraph :: Int64 -> Double ->Graph Node
 generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
     where 
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
-
 
 
 getNdIndex node = do
@@ -321,6 +314,22 @@ dynamicProcess graphmap = do
   store nodeMapTable (Just 0) (X (S "root" ) [])
   store graph1Table (Just 0) (Labels 0 0 Main.max Set.empty Set.empty (-100) (-100) (-100) (-100) )    
   processNodes graphmap firstnode (S "root")
+  processRemainingNodes graphmap
+
+processRemainingNodes :: GraphMap Node -> Daison ()
+processRemainingNodes graphmap = do 
+  nodes <- select [nd | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
+  let graphlist = Map.toList graphmap
+  let nodelist = map (\(x,y) -> x ) graphlist
+  let difference = nodelist List.\\ nodes
+  liftIO $ print $ " nodes :  " ++ show nodes
+  liftIO $ print $ " difference : " ++ show difference
+  liftIO $ print $ " nodelist : " ++ show nodelist
+  when (length difference > 0 ) $ do 
+    processNodes graphmap (head difference) (S "root")
+    processRemainingNodes graphmap
+  return()
+
 
 
 processNodes :: GraphMap Node -> Node -> Node -> Daison()
@@ -906,10 +915,25 @@ updateDirects parent gp = do
 -- replacing process in the main function initiates static AILabel process.
 
 
+processRemainingNodes1 :: GraphMap Node -> Daison ()
+processRemainingNodes1 graphmap = do 
+  nodes <- select [nd | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
+  let graphlist = Map.toList graphmap
+  let nodelist = map (\(x,y) -> x ) graphlist
+  let difference = nodelist List.\\ nodes
+  liftIO $ print $ " nodes :  " ++ show nodes
+  liftIO $ print $ " difference : " ++ show difference
+  liftIO $ print $ " nodelist : " ++ show nodelist
+  when (length difference > 0 ) $ do 
+    processNodes1 graphmap (head difference) (head difference)
+    processRemainingNodes1 graphmap
+  return()
+
 staticProcess :: GraphMap Node -> Daison ()
 staticProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
   processNodes1 graphmap firstnode firstnode
+  processRemainingNodes1 graphmap
 
 processNodes1 :: GraphMap Node -> Node -> Node -> Daison()
 processNodes1 graph nd parent = do
