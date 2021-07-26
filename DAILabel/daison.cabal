@@ -29,6 +29,7 @@ library
     , binary
     , bytestring
     , containers
+    , criterion
     , random
     , syb
     , text
@@ -37,7 +38,7 @@ library
 executable daison-exe
   main-is: DAILabel.hs
   other-modules:
-      DAILabel_Static
+      Common
       Paths_daison
   hs-source-dirs:
       app
@@ -46,6 +47,7 @@ executable daison-exe
       QuickCheck
     , base
     , containers
+    , criterion
     , daison
     , ghc-prim
     , process

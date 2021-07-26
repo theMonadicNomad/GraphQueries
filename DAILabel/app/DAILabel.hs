@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 --module DynDAILabel where
+import Criterion.Main
 import System.Random
 import           Database.Daison
 import           System.Environment
@@ -21,6 +22,7 @@ import Data.Maybe (fromJust)
 import System.Process (callProcess, callCommand)
 import qualified Data.Bits as Bits
 import Data.Int
+
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -237,7 +239,8 @@ main = do
   let n = (read inp_1 :: Int64)
   let d = (read inp_2 :: Double)
   let Graph g1 = generateGraph n d
-  print $ show g1
+  --print $ show g1 
+  --let process_char = 'd'
   db <- openDB databaseTest
   (a,b)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
@@ -254,8 +257,47 @@ main = do
   putStrLn "FROM MAIN"
   mapM_ (\y -> putStrLn (show y) ) a
   mapM_ (\y -> putStrLn (show y) ) b
+  -- closeDB db
+  putStrLn (" Enter the first node : ")
+  firstChar <- getLine
+  putStrLn (" Enter the second node : ")
+  secondChar <- getLine
+  let f = I (read firstChar :: Int64)
+  let s = I (read secondChar :: Int64)
+
+  defaultMain [ bgroup "searchs" [
+    bench "depthfirst search " $ nfIO  (bm_dfsearch f s db ReadWriteMode),
+    bench "labelsearch " $ nfIO  (bm_search f s db ReadWriteMode) ]]
+  
+  --makeDynamicOperation databaseTest ReadWriteMode
   closeDB db
-  makeDynamicOperation databaseTest ReadWriteMode
+
+bm_dfsearch firstChar secondChar db readwritemode = do 
+    -- db <- openDB test_db  
+    (a) <- runDaison db readwritemode $ do 
+      nd1 <- getNdIndex firstChar
+      nd2 <- getNdIndex secondChar
+      flag <- dfsearch nd1 nd2
+      liftIO $ print  $ " search result df : " ++ show flag 
+      x <- return flag 
+      return (x)
+   -- closeDB db
+    return()
+
+bm_search firstChar secondChar db readwritemode = do 
+   -- db <- openDB test_db  
+    (a) <- runDaison db readwritemode $ do 
+      nd1 <- getNdIndex ( firstChar)
+      nd2 <- getNdIndex ( secondChar)
+      flag <- search nd1 nd2
+      liftIO $ print  $ " search result normal rsult : " ++ show flag 
+      x <- return flag 
+      return (x)
+    -- closeDB db
+    return()
+
+
+
 
 generateGraph :: Int64 -> Double ->Graph Node
 generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
@@ -298,7 +340,8 @@ makeDynamicOperation test_db readwritemode = do
         'd' -> handleDelete nd1 nd2 
         's' -> do 
           flag <- dfsearch nd1 nd2
-          liftIO $ print  $ " search result : " ++ show flag
+          flag1 <- search nd1 nd2
+          liftIO $ print  $ " search result df : " ++ show flag ++ " dailabel:" ++show flag1
       x <- select [ x | x <- from graph1Table everything ] 
       y <- select [ x | x <- from nodeMapTable everything ]
       return (x,y)
@@ -383,6 +426,8 @@ updateLabel record@(Labels ptrp ppr pps _ _ pfc flc pns pls ) nd1 record1@(Label
 
 handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
+  liftIO $ print  $ " nd1 : " ++ show nd1 ++ "  nd2 : " ++ show nd2
+
   res1 <- select (from graph1Table (at nd1))
   res2 <- select (from graph1Table (at nd2))
   
@@ -995,6 +1040,7 @@ processNodes1 graph nd parent = do
 
 insertNodeinDB :: Node -> Node ->Daison Bool
 insertNodeinDB node parent  = do
+  
   map <- select [ind | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == node  ]
   par <- if (node == parent) then return [(0,( C 'a',[]))] 
          else select [(ind,(nd, edgess)) | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == parent  ]
