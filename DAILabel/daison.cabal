@@ -39,6 +39,7 @@ executable daison-exe
   main-is: DAILabel.hs
   other-modules:
       Common
+      DAILabel_backup
       Paths_daison
   hs-source-dirs:
       app
