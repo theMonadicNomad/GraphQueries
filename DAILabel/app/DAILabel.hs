@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module DAILabel where
+module Main where
 import System.Random
 import           Database.Daison
 import           System.Environment

@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
---module AILabel where 
+module Main where 
 
 import           Database.Daison
 import           System.Environment
