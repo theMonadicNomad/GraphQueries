@@ -37,7 +37,7 @@ type Directs = Set Nd
 data Graph a = Graph [(a, [a])] 
   deriving Show
 
-max = maxBound :: Nd
+max_bound = maxBound :: Nd
 
 type GraphMap a = Map a [a]
 type Special = Bool
@@ -162,3 +162,64 @@ graph3 = Graph
     (I 54, [I 55]),
     (I 55, []) 
   ]
+
+
+
+instance Show Labels where
+  show (Labels a b c d e f g h i) = "TP: " ++  show a ++   " Pre: " ++ show b ++
+   " Post:  " ++ show c   ++   " Hops: " ++ show d ++ " Directs:  " ++ show e ++
+   "FC : " ++ show f ++ " LC :  " ++ show g ++ " NS: " ++ show h ++ " PS : " ++ show i
+ 
+graph1Table :: Table (Labels)
+graph1Table = table "graph1"
+            `withIndex` graph_index
+
+graph_index :: Index Labels Labels 
+graph_index = index graph1Table "node_index" Prelude.id
+
+nodeMapTable :: Table X
+nodeMapTable = table "nodemap" `withIndex` nodemap_index
+
+
+nodemap_index :: Index X Node
+nodemap_index = index nodeMapTable "nodemap_index" nd
+
+counters :: Table (String, Nd)
+counters = table "counter" 
+             `withIndex` counter_index
+
+counter_index :: Index (String, Nd) String
+counter_index = index counters "counter_index" fst
+
+
+generateGraph :: Int64 -> Double ->Graph Node
+generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
+    where 
+        restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
+
+
+getNdIndex node = do
+  nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
+  case nod of
+    [nd] -> return nd
+    []   -> do 
+{-       c_counter <- getCounter
+      incrementCounter >> incrementCounter  -}
+      pkey <- insert_ nodeMapTable (X node [])
+--      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
+      return pkey
+    _    -> error $ "ivalid getindex nd :" ++ show nod
+
+
+addHop :: Nd -> Labels -> Nd -> Daison ()
+addHop nd1 (Labels tp pr ps hp dir fc lc ns ls) nd2 = do
+  store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir fc lc ns ls)
+  return ()
+
+updateDirectInAncestors :: Nd -> Labels -> (Directs -> Directs) -> Daison ()
+updateDirectInAncestors nd (Labels tp pr ps hp dir fc lc ns ls) f = do
+  store graph1Table (Just nd) (Labels tp pr ps hp (f dir) fc lc ns ls)
+  when (tp /= 0) $ do
+    record <- query firstRow (from graph1Table (at tp))
+    updateDirectInAncestors tp record f
+
