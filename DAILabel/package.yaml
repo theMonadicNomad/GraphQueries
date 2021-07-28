@@ -31,6 +31,15 @@ library:
 executables:
   daison-exe:
     main: MainProject.hs
+    other-modules:
+      AILabel
+      AILabel_modified
+      Common
+      DAILabel
+      DAILabel_backup
+      DAILabel_modified
+      Paths_daison
+
     source-dirs: app
     ghc-options:
       - -threaded
@@ -46,6 +55,15 @@ executables:
       - criterion
   benchmarking-exe:
     main: BenchMarking.hs
+    other-modules:
+      AILabel
+      AILabel_modified
+      Common
+      DAILabel
+      DAILabel_backup
+      DAILabel_modified
+      Paths_daison
+
     source-dirs: app
     ghc-options:
       - -threaded

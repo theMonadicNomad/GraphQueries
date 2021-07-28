@@ -1,5 +1,5 @@
 
-module MainProject where
+module Main where
 
 
 main :: IO ()

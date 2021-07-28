@@ -1,4 +1,4 @@
---module BenchMarking where 
+module Main where 
 
 main :: IO ()
 main = do
