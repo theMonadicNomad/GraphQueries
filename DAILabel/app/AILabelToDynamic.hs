@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module DAILabel_Static where 
+module AILabelToDynamic where 
 
 import           Database.Daison
 import           System.Environment

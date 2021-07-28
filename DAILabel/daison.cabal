@@ -35,9 +35,10 @@ library
   default-language: Haskell2010
 
 executable daison-exe
-  main-is: DAILabel.hs
+  main-is: AILabel.hs
   other-modules:
-      DAILabel_Static
+      AILabelToDynamic
+      DAILabel
       Paths_daison
   hs-source-dirs:
       app

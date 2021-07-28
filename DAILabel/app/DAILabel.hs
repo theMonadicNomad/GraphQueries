@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
---module DynDAILabel where
+module DAILabel where
 import System.Random
 import           Database.Daison
 import           System.Environment
@@ -35,7 +35,7 @@ type Directs = Set Nd
 data Graph a = Graph [(a, [a])] 
   deriving Show
 
-max = maxBound :: Nd
+max_bound = maxBound :: Nd
 
 type GraphMap a = Map a [a]
 type Special = Bool
@@ -243,7 +243,7 @@ main = do
     tryCreateTable graph1Table
     tryCreateTable counters
     tryCreateTable nodeMapTable
---    insert counters (return ( "l_max", Main.max ))
+--    insert counters (return ( "l_max", max_bound ))
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
     let graphmap1 =  Map.fromList g1
@@ -312,7 +312,7 @@ dynamicProcess :: GraphMap Node -> Daison ()
 dynamicProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
   store nodeMapTable (Just 0) (X (S "root" ) [])
-  store graph1Table (Just 0) (Labels 0 0 Main.max Set.empty Set.empty (-100) (-100) (-100) (-100) )    
+  store graph1Table (Just 0) (Labels 0 0 max_bound Set.empty Set.empty (-100) (-100) (-100) (-100) )    
   processNodes graphmap firstnode (S "root")
   processRemainingNodes graphmap
 
@@ -526,16 +526,16 @@ handleInsert nd1 nd2 = do
       case res of 
         record@(Labels _ _ _ _ _ _  rlc _ _) -> if rlc < 0 then 
           do 
-            let pre1 = average 0 Main.max
-            let post1 = average pre1 Main.max
+            let pre1 = average 0 max_bound
+            let post1 = average pre1 max_bound
             store graph1Table (Just 0) record{firstChild = nd1, lastChild =nd1}
             return (pre1,post1, (-1))
           else do
             res1 <- query firstRow (from graph1Table (at rlc))
             case res1 of 
               record1@(Labels _ pr1 ps1 _ _ _ _ _ _)   -> do 
-                let pre1 = average ps1 Main.max 
-                let post1 = average pre1 Main.max
+                let pre1 = average ps1 max_bound 
+                let post1 = average pre1 max_bound
                 store graph1Table (Just rlc) record1{ nextSibling = nd1} 
                 store graph1Table (Just 0) record{ lastChild =nd1} 
                 return (pre1,post1, rlc)
@@ -544,8 +544,8 @@ handleInsert nd1 nd2 = do
       case res of 
         record@(Labels _ _ _ _ _ _  rlc _ _) -> if rlc < 0 then 
           do 
-            let pre1 = average 0 Main.max
-            let post1 = average pre1 Main.max
+            let pre1 = average 0 max_bound
+            let post1 = average pre1 max_bound
             let pre2 = average pre1 post1
             let post2 = average pre2 post1
             store graph1Table (Just 0) record{firstChild = nd1, lastChild =nd1}
@@ -554,8 +554,8 @@ handleInsert nd1 nd2 = do
             res1 <- query firstRow (from graph1Table (at rlc))
             case res1 of 
               record1@(Labels  _ pr1 ps1 _ _ _ _ _ _ )-> do 
-                let pre1 = average ps1 Main.max 
-                let post1 = average pre1 Main.max
+                let pre1 = average ps1 max_bound 
+                let post1 = average pre1 max_bound
                 let pre2 = average pre1 post1 
                 let post2 = average pre2 post1 
                 store graph1Table (Just rlc) record1{ nextSibling = nd1} 
@@ -624,7 +624,7 @@ mainLoop :: Int64 -> Int64-> PrePostRef ->PrePostRef -> PrePostRef -> Daison (Nd
 mainLoop d count v begin end = do
   --max <- getCounter
 --  liftIO $ print $ " mainloop v :" ++ show v ++ "  : " ++ show begin
-  if (d <  Main.max) then 
+  if (d <  max_bound) then 
     do 
       (begin1, count1, v1, d1)  <- goPrev (begin) count v d
       (end1, count2, v2, d2)  <- goNext (end) count1 v1 d1
