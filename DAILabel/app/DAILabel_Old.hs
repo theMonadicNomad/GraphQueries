@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module DAILabel_Old where
+module Main where
 
 import           Database.Daison
 import           System.Environment
