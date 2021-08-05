@@ -51,7 +51,7 @@ executable ailabel-exe
     , random
   default-language: Haskell2010
 
-executable daison-exe
+executable dailabel-exe
   main-is: DAILabel.hs
   other-modules:
       Paths_daison

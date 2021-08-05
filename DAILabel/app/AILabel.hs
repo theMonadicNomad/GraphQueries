@@ -180,7 +180,7 @@ main1 = do
 main :: IO ()
 main = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
-  putStrLn ("Enter the number of nodes : ")
+{-   putStrLn ("Enter the number of nodes : ")
   inp_1 <- getLine
   putStrLn (" Enter the density : ")
   inp_2 <- getLine
@@ -188,7 +188,7 @@ main = do
   let d = (read inp_2 :: Double)
   let Graph g1 = generateGraph n d
   print $ show g1
-
+ -}
   db <- openDB databaseTest
   (a,b)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
@@ -200,7 +200,7 @@ main = do
       do  -}     
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
-    let graphmap1 =  Map.fromList g1
+    let graphmap1 =  Map.fromList g
     process graphmap1
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]

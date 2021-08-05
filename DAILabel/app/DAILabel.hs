@@ -392,6 +392,10 @@ handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
   res2 <- select (from graph1Table (at nd2))  
+  par <-  query firstRow (from nodeMapTable (at nd1))
+  case par of
+    (X pnd edges) ->  store nodeMapTable (Just nd1) (X pnd (edges ++ [nd2]))
+
   case (res1,res2) of
 
     ([record1@(Labels tp1 _ _ hp1 _  )],[record2@(Labels tp2 _ _ hp2 dir2  )])   -- Case 1
@@ -445,10 +449,17 @@ handleInsert nd1 nd2 = do
              liftIO $ print $ "nd 1: "++show nd1 ++ " nd2 : " ++ show nd2
              (pre,post) <- insertIsolatedNode
              liftIO $ print $ "nd 1: "++show nd1 ++ " nd2 : " ++ show nd2 ++ " pr : " ++ show pre ++ " ps: " ++ show post              
-             store graph1Table (Just nd1) record1{postL= post}
-
-             store graph1Table (Just nd2) (Labels nd1 ps1 pre Set.empty Set.empty)
-             {- TODO: - update prevSibling for the firstChild of nd1 ??
+             store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty)
+             resetCounter
+             relabel 1 []
+ 
+             {- if (ps1== max_bound) then 
+               store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty)
+             else 
+               do
+                 store graph1Table (Just nd1) record1{postL= post}
+                 store graph1Table (Just nd2) (Labels nd1 ps1 pre Set.empty Set.empty)
+ -}             {- TODO: - update prevSibling for the firstChild of nd1 ??
                       - update firstChild for nd1 -}
 
              return ()
@@ -474,9 +485,6 @@ handleInsert nd1 nd2 = do
              store graph1Table (Just nd1) (Labels 0   pre1 post1 Set.empty Set.empty )
              store graph1Table (Just nd2) (Labels nd1 pre2 post2 Set.empty Set.empty )
              return ()
-  par <-  query firstRow (from nodeMapTable (at nd1))
-  case par of
-    (X pnd edges) ->  store nodeMapTable (Just nd1) (X pnd (nd2:edges))
   return()
 --  store nodeMapTable (Just parent) (X pnd (List.nub (nd:edges)))
   where 
@@ -511,6 +519,11 @@ handleDelete nd1 nd2 = do
       deleteHopsFrom nd1 nd2
       return ()
 
+reLabelFromRoot :: Nd -> Daison ()
+reLabelFromRoot nd = do 
+  return ()
+
+
 addHop :: Nd -> Labels -> Nd -> Daison ()
 addHop nd1 (Labels tp pr ps hp dir ) nd2 = do
   store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir )
@@ -531,6 +544,200 @@ removeTreeParent nd1 = do
     [(nd , Labels tp pr ps hp dir )] -> do
       update_ graph1Table (return (nd, Labels 0 pr ps hp dir) )
     
+
+
+deleteDirectsandAncestors :: Nd -> Nd -> Daison()
+deleteDirectsandAncestors nd1 nd2 = do
+  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
+  case record of
+    [(nd , Labels tp pr ps hp dir )] -> do
+      update_ graph1Table (return (nd, Labels tp pr ps hp (Set.delete nd2 dir)  ) )
+      when (tp/=0) $ deleteDirectsandAncestors tp nd2
+    _ -> error $ "invalid from deletedirectss and ancestors " ++ show nd1 ++ show nd2
+
+
+deleteHopsFrom :: Nd -> Nd -> Daison ()
+deleteHopsFrom nd1 nd2 = do
+  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
+  case record of
+    [(nd , Labels tp pr ps hp dir )] -> do
+      update_ graph1Table (return (nd, Labels tp pr ps (Set.delete nd2 hp) dir ) )
+    _ -> error "invalid"  
+
+
+updateDirectInAncestors :: Nd -> Labels -> (Directs -> Directs) -> Daison ()
+updateDirectInAncestors nd (Labels tp pr ps hp dir ) f = do
+  store graph1Table (Just nd) (Labels tp pr ps hp (f dir) )
+  when (tp /= 0) $ do
+    record <- query firstRow (from graph1Table (at tp))
+    updateDirectInAncestors tp record f
+
+
+isTreeEdge :: Nd -> Nd -> Daison Bool
+isTreeEdge nd1 nd2 = do
+  record <- select [label1 | (label1) <- from graph1Table (at nd1)  ] 
+  case record of 
+    [(Labels tp pr ps hp dir )] -> case (List.elem nd2 hp) of
+      True -> return False
+      False -> do 
+        nodemap_record <- select [edgs | ( X n edgs) <- from nodeMapTable (at nd1)  ]
+        let nd_edges = head nodemap_record
+        if (List.elem nd2 nd_edges) then 
+          return True
+        else 
+          return False
+    _ -> error $ " from istreeedge : " ++ show nd1 ++ show nd2
+ 
+
+isTheOnlyNonTreeEdge :: Nd -> Nd -> Daison Bool
+isTheOnlyNonTreeEdge nd1 nd2 = do
+  record <- select [(nd1,label1) | (label1) <- from graph1Table (at nd1)  ] 
+  case record of 
+    [(nd, label)] -> case label of
+      Labels trp pr ps hp dir  ->  do 
+        if (Set.member nd2 hp) && (Set.size hp ==1) then 
+          return True
+        else if (Set.member nd2 hp) && (Set.size hp > 1) then
+          return False
+        else 
+          error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
+    _ -> error " couldnt find record from isonlynontreeedge "
+
+
+getParent :: Nd -> Daison Nd
+getParent node = do
+  record <- select [(node, labels) | (labels) <- from graph1Table (at node) ] 
+  case record of
+    [] -> error $ "invalid parent node :" ++ show node
+    [(ind1,  label1)] -> case label1 of 
+      (Labels trp _ _ _ _  ) -> return trp
+    _           -> error "multiple parents error "
+
+getCounter :: Daison Nd
+getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
+
+
+getMax :: Daison Nd
+getMax = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
+
+
+updateMax :: Nd -> Daison()
+updateMax newmax =   update_ counters (return (1, ("l_max", newmax) )) 
+
+
+
+incrementCounter :: Daison ()
+incrementCounter = do
+  c_counter <- getCounter  
+--  liftIO $ print $ " counter current value : " ++ show (c_counter+1) 
+  update_ counters (return (1, ("counter", c_counter+1) )) 
+  
+
+
+resetCounter :: Daison ()
+resetCounter = update_ counters (return (1, ("counter", 0) ))
+
+
+
+queryM :: Nd -> Nd -> Daison Bool
+queryM nd1 nd2 = do
+  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
+  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+  case label1 of 
+    [(Labels trp1 pre1 post1 hp1 dir1 )] -> do
+      case label2 of
+        [(Labels trp2 pre2 post2 hp2 dir2)] -> if  (pre1 < post2 && post2 <= post1) then return True
+                                             else return False
+        _ -> error "error "                
+    _ -> error "error again "
+
+
+search :: Nd -> Nd -> Daison Bool
+search nd1 nd2 = do
+  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
+  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+  case label1 of 
+    [(Labels trp1 pre1 post1 hp1 dir1 )] -> do
+      flag <- queryM nd1 nd2
+      if flag then return True
+      else do
+        x <- or <$> (mapM (\x -> queryM x nd2) (Set.toList hp1)) 
+        if not x 
+          then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
+        else return x
+
+dfsearch :: Nd -> Nd -> Daison Bool
+dfsearch nd1 nd2 = do 
+  record <- select [edgs | (X n edgs) <- from nodeMapTable (at nd1)  ] 
+  case (head record) of
+    lis@(first : rest) -> case (List.elem nd2 lis) of
+      True -> return True
+      False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
+
+relabel :: Nd -> [Nd] -> Daison [Nd]
+relabel nd visited =  do 
+  liftIO $ print $ (" relabel, nd : ") ++ show nd ++ "  visited : " ++ show visited
+  x <- updatePre nd visited
+  if x then return visited
+       else do
+         edges <- getEdges nd 
+         liftIO $ print $ " nd :" ++ show nd ++ " edges : " ++ show edges
+         nv <- case edges of
+           [] -> return visited
+           rest -> foldM (\acc y -> relabel y acc) visited  rest
+         updatePost nd 
+         return (nd : nv)
+ 
+updatePre :: Nd -> [Nd] -> Daison Bool
+updatePre nd visited = do 
+  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
+  case record of 
+    [(nd, Labels trp pr ps hp dir)] -> if pr == ps || elem nd visited then return True
+                                           else   
+                                             do
+                                               c_counter <- getCounter
+                                               incrementCounter
+                                               update_ graph1Table (return (nd, Labels trp c_counter c_counter hp dir  ))
+                                               return False
+    _ -> error "error " 
+
+updatePost :: Nd -> Daison ()
+updatePost nd = do 
+  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
+  case record of 
+    [(nd, label)] -> case label of
+      Labels trp pr ps hp dir  ->  do 
+        c_counter <- getCounter
+        incrementCounter
+        update_ graph1Table (return (nd, Labels trp pr c_counter hp dir ))
+      _   -> error "error from updatepost"
+    _ -> error "error " 
+
+
+getEdges :: Nd -> Daison [Nd]
+getEdges nd = do 
+  record <- select [ edgs| ( X n edgs) <- from nodeMapTable (at nd)  ] 
+  return . head $ record
+
+updateDirects :: Nd -> Nd -> Daison()
+updateDirects parent gp = do
+  record <- select [(gp,label1) | (label1) <- from graph1Table (at gp)  ] 
+  case record of 
+    [(nd, label)] -> case label of
+      Labels trp pr ps hp dir ->  do
+        update_ graph1Table (return (nd, Labels trp pr ps hp (Set.insert parent dir) ))
+      _ -> error "updatedirects error"
+    _   -> liftIO $ print record
+  when (gp > 0) $ do
+    ggp <- getParent gp
+    when (ggp > 0) $ updateDirects parent ggp
+
+
+-- Functions related to Static AILabel.
+-- replacing process in the main function initiates static AILabel process.
+
+
+
 
 {- reLabelMain :: PrePostRef -> Daison ()
 reLabelMain v  {- (PreLabel nd) -} =  do 
@@ -672,173 +879,4 @@ prevOf (PostLabel nd) = do
     [(Labels trp pr ps hp dir fc lc ns ls)] -> if lc >0 then  return (PostLabel lc)  
       else return (PreLabel nd)
  -}
-
-deleteDirectsandAncestors :: Nd -> Nd -> Daison()
-deleteDirectsandAncestors nd1 nd2 = do
-  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
-  case record of
-    [(nd , Labels tp pr ps hp dir )] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps hp (Set.delete nd2 dir)  ) )
-      when (tp/=0) $ deleteDirectsandAncestors tp nd2
-    _ -> error $ "invalid from deletedirectss and ancestors " ++ show nd1 ++ show nd2
-
-
-deleteHopsFrom :: Nd -> Nd -> Daison ()
-deleteHopsFrom nd1 nd2 = do
-  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
-  case record of
-    [(nd , Labels tp pr ps hp dir )] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps (Set.delete nd2 hp) dir ) )
-    _ -> error "invalid"  
-
-
-updateDirectInAncestors :: Nd -> Labels -> (Directs -> Directs) -> Daison ()
-updateDirectInAncestors nd (Labels tp pr ps hp dir ) f = do
-  store graph1Table (Just nd) (Labels tp pr ps hp (f dir) )
-  when (tp /= 0) $ do
-    record <- query firstRow (from graph1Table (at tp))
-    updateDirectInAncestors tp record f
-
-
-isTreeEdge :: Nd -> Nd -> Daison Bool
-isTreeEdge nd1 nd2 = do
-  record <- select [label1 | (label1) <- from graph1Table (at nd1)  ] 
-  case record of 
-    [(Labels tp pr ps hp dir )] -> case (List.elem nd2 hp) of
-      True -> return False
-      False -> do 
-        nodemap_record <- select [edgs | ( X n edgs) <- from nodeMapTable (at nd1)  ]
-        let nd_edges = head nodemap_record
-        if (List.elem nd2 nd_edges) then 
-          return True
-        else 
-          return False
-    _ -> error $ " from istreeedge : " ++ show nd1 ++ show nd2
- 
-
-isTheOnlyNonTreeEdge :: Nd -> Nd -> Daison Bool
-isTheOnlyNonTreeEdge nd1 nd2 = do
-  record <- select [(nd1,label1) | (label1) <- from graph1Table (at nd1)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels trp pr ps hp dir  ->  do 
-        if (Set.member nd2 hp) && (Set.size hp ==1) then 
-          return True
-        else if (Set.member nd2 hp) && (Set.size hp > 1) then
-          return False
-        else 
-          error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
-    _ -> error " couldnt find record from isonlynontreeedge "
-
-
-getParent :: Nd -> Daison Nd
-getParent node = do
-  record <- select [(node, labels) | (labels) <- from graph1Table (at node) ] 
-  case record of
-    [] -> error $ "invalid parent node :" ++ show node
-    [(ind1,  label1)] -> case label1 of 
-      (Labels trp _ _ _ _  ) -> return trp
-    _           -> error "multiple parents error "
-
-getCounter :: Daison Nd
-getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
-
-
-getMax :: Daison Nd
-getMax = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
-
-
-updateMax :: Nd -> Daison()
-updateMax newmax =   update_ counters (return (1, ("l_max", newmax) )) 
-
-
-
-incrementCounter :: Daison ()
-incrementCounter = do
-  c_counter <- getCounter  
---  liftIO $ print $ " counter current value : " ++ show (c_counter+1) 
-  update_ counters (return (1, ("counter", c_counter+1) )) 
-  
-
-
-resetCounter :: Daison ()
-resetCounter = update_ counters (return (1, ("counter", 0) ))
-
-
-
-queryM :: Nd -> Nd -> Daison Bool
-queryM nd1 nd2 = do
-  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
-  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
-  case label1 of 
-    [(Labels trp1 pre1 post1 hp1 dir1 )] -> do
-      case label2 of
-        [(Labels trp2 pre2 post2 hp2 dir2)] -> if  (pre1 < post2 && post2 <= post1) then return True
-                                             else return False
-        _ -> error "error "                
-    _ -> error "error again "
-
-
-search :: Nd -> Nd -> Daison Bool
-search nd1 nd2 = do
-  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
-  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
-  case label1 of 
-    [(Labels trp1 pre1 post1 hp1 dir1 )] -> do
-      flag <- queryM nd1 nd2
-      if flag then return True
-      else do
-        x <- or <$> (mapM (\x -> queryM x nd2) (Set.toList hp1)) 
-        if not x 
-          then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
-        else return x
-
-dfsearch :: Nd -> Nd -> Daison Bool
-dfsearch nd1 nd2 = do 
-  record <- select [edgs | (X n edgs) <- from nodeMapTable (at nd1)  ] 
-  case (head record) of
-    lis@(first : rest) -> case (List.elem nd2 lis) of
-      True -> return True
-      False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
-
-{- relabel :: Nd -> [Nd] -> Daison [Nd]
-relabel nd visited =  do 
---  liftIO $ print $ (" relabel, nd : ") ++ show nd ++ "  visited : " ++ show visited
-  x <- updatePre nd visited
-  if x then return visited
-       else do
-         edges <- getEdges nd 
---         liftIO $ print $ " nd :" ++ show nd ++ " edges : " ++ show edges
-         nv <- case edges of
-           [] -> return visited
-           rest -> foldM (\acc y -> relabel y acc) visited  rest
-         updatePost nd 
-         return (nd : nv)
- -}
- 
-getEdges :: Nd -> Daison [Nd]
-getEdges nd = do 
-  record <- select [ edgs| ( X n edgs) <- from nodeMapTable (at nd)  ] 
-  return . head $ record
-
-updateDirects :: Nd -> Nd -> Daison()
-updateDirects parent gp = do
-  record <- select [(gp,label1) | (label1) <- from graph1Table (at gp)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels trp pr ps hp dir ->  do
-        update_ graph1Table (return (nd, Labels trp pr ps hp (Set.insert parent dir) ))
-      _ -> error "updatedirects error"
-    _   -> liftIO $ print record
-  when (gp > 0) $ do
-    ggp <- getParent gp
-    when (ggp > 0) $ updateDirects parent ggp
-
-
--- Functions related to Static AILabel.
--- replacing process in the main function initiates static AILabel process.
-
-
-
-
 

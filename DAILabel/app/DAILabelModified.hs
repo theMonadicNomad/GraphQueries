@@ -179,8 +179,8 @@ graph4 = Graph
 
 
 instance Show Labels where
-  show (Labels a b c d e f g h i) = "TP: " ++  show a ++   {- " Pre: " ++ show b ++
-   " Post:  " ++  show c   ++   " Hops: " ++ show d ++ " Directs:  " ++ -}show e ++
+  show (Labels a b c d e f g h i) = "TP: " ++  show a ++   " Pre: " ++ show b ++
+   " Post:  " ++  show c   ++   " Hops: " ++ show d ++ " Directs:  " ++ show e ++
    "FC : " ++ show f ++ " LC :  " ++ show g ++ " NS: " ++ show h ++ " PS : " ++ show i
  
 graph1Table :: Table (Labels)
@@ -259,8 +259,8 @@ main = do
     tryCreateTable nodeMapTable
 --    insert counters (return ( "l_max", max_bound ))
     insert counters (return ( "counter", 0 ))
-    let Graph g = graph4
-    let graphmap1 =  Map.fromList g1
+    let Graph g = graph2
+    let graphmap1 =  Map.fromList g
     --if (process_char == 'd') then 
     dynamicProcess graphmap1 --else staticProcess graphmap1
     a <- select [ x | x <- from graph1Table everything ]

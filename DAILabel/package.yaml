@@ -28,7 +28,7 @@ library:
   build-tools: hsc2hs
 
 executables:
-  daison-exe:
+  dailabel-exe:
     main: DAILabel.hs
     other-modules:
 #      AILabelToDynamic
