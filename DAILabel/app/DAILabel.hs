@@ -454,11 +454,6 @@ handleDelete nd1 nd2 = do
       deleteHopsFrom nd1 nd2
       return ()
 
-reLabelFromRoot :: Nd -> Daison ()
-reLabelFromRoot nd = do 
-  return ()
-
-
 addHop :: Nd -> Labels -> Nd -> Daison ()
 addHop nd1 (Labels tp pr ps hp dir ) nd2 = do
   store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir )
@@ -680,11 +675,6 @@ updateDirects parent gp = do
   when (gp > 0) $ do
     ggp <- getParent gp
     when (ggp > 0) $ updateDirects parent ggp
-
-
-
-
-
 
 
 {- updateLabel :: Labels ->Nd ->Labels -> Nd -> Daison()
