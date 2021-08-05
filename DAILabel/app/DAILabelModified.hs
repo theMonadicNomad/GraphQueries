@@ -176,6 +176,30 @@ graph4 = Graph
     (I 6, [])
   ]
 
+graph5 :: Graph Node
+graph5 = Graph
+    [ ( C 'a',  [ C 'b', C 'e']  ),
+      ( C 'b', [  C 'd', C 'c' ] ),
+      ( C 'c', [  ] ),
+      ( C 'd', [ ] ),
+      ( C 'e', [ C 'f',  C 'g' ] ),
+      ( C 'f', [  ] ),
+      ( C 'g', [  ] ),
+      ( C 'h', [ C 'i', C 'l' ] ),
+      ( C 'i', [ C 'j' , C 'k' ] ),
+      ( C 'j', [ ] ),
+      ( C 'k', [] ),
+      ( C 'l', [ C 'm', C 'n' ] ),
+      ( C 'm', [  ] ),
+      ( C 'n', [  ] ),
+      ( C 'o', [ C 'p' , C 'q' ] ),
+      ( C 'p', [  ] ),
+      ( C 'q', [  ] )
+
+
+      
+    ]
+
 
 
 instance Show Labels where
@@ -259,7 +283,7 @@ main = do
     tryCreateTable nodeMapTable
 --    insert counters (return ( "l_max", max_bound ))
     insert counters (return ( "counter", 0 ))
-    let Graph g = graph2
+    let Graph g = graph5
     let graphmap1 =  Map.fromList g
     --if (process_char == 'd') then 
     dynamicProcess graphmap1 --else staticProcess graphmap1
@@ -413,19 +437,20 @@ handleInsert nd1 nd2 = do
               if Set.null hp1
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)                        -- Case 1.1.1
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)                        -- Case 1.1.2
-              update_ graph1Table (return (nd2, record2{tree_parent=nd1{- , nextSibling=fc1 -}}))
+              
               --liftIO $ print $ " nd :" ++ show nd1 ++ " edges : " ++ show record1
               --liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
                                    
 
               if (lc1 <0) then 
+                update_ graph1Table (return (nd2, record2{tree_parent=nd1, nextSibling = -1{- , nextSibling=fc1 -}})) >>
                 update_ graph1Table (return (nd1, record1{firstChild = nd2, lastChild= nd2}))>>
-                updateLabel record1 nd2 record2 (-1)
+                updateLabel record1 nd2 record2 {nextSibling = (-1)} (-1)
                 else 
                   do update_ graph1Table (return (nd1, record1{lastChild= nd2}))
                      record3 <- query firstRow (from graph1Table (at lc1))
                      update_ graph1Table (return (lc1, record3{nextSibling = nd2}))
-                     update_ graph1Table (return (nd2, record2{lastSibling = lc1}))
+                     update_ graph1Table (return (nd2, record2{tree_parent = nd1, nextSibling = -1, lastSibling = lc1}))
                      updateLabel record1 lc1 record3 nd2
               when(ls2>0) $
                 do 

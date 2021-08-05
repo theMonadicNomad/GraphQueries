@@ -224,14 +224,14 @@ isAlphabet ch = if ch `elem` ['a'..'z'] || ch `elem` ['A'..'Z']
 main :: IO ()
 main = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
-{-   putStrLn ("Enter the number of nodes : ")
+  putStrLn ("Enter the number of nodes : ")
   inp_1 <- getLine
   putStrLn (" Enter the density : ")
   inp_2 <- getLine
   let n = (read inp_1 :: Int64)
   let d = (read inp_2 :: Double)
   let Graph g1 = generateGraph n d
-  print $ show g1 -}
+  print $ show g1 
   db <- openDB databaseTest
   (a,b)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
@@ -240,7 +240,7 @@ main = do
 --    insert counters (return ( "l_max", max_bound ))
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
-    let graphmap1 =  Map.fromList g
+    let graphmap1 =  Map.fromList g1
     dynamicProcess graphmap1 
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
@@ -610,7 +610,9 @@ relabel nd visited t =  do
   x <- updatePre nd visited
   if x then return visited
        else do
-         edges <- if t == 's' then getTreeEdges nd else getEdges nd 
+         edges <- if t == 's' then getTreeEdges nd else getEdges nd
+         --getTree Edges is used to relabel the spanning tree when an edge is deleted in case 1
+         --getEdges is used to relabel the whole spanning tree
          liftIO $ print $ " nd :" ++ show nd ++ " edges : " ++ show edges
          nv <- case edges of
            [] -> return visited
