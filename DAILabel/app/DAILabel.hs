@@ -240,7 +240,7 @@ main = do
 --    insert counters (return ( "l_max", max_bound ))
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
-    let graphmap1 =  Map.fromList g1
+    let graphmap1 =  Map.fromList g
     dynamicProcess graphmap1 
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
@@ -311,7 +311,8 @@ dynamicProcess graphmap = do
   processNodes graphmap firstnode (S "root")
   processRemainingNodes graphmap
 
-
+--This process finds all the components that are not part of the main graph and process them 
+-- there can be many disconnected components
 processRemainingNodes :: GraphMap Node -> Daison ()
 processRemainingNodes graphmap = do 
   nodes <- select [nd | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
@@ -349,6 +350,7 @@ handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
   res2 <- select (from graph1Table (at nd2))  
   par <-  query firstRow (from nodeMapTable (at nd1))
+  allnodes <- getAllNodes
   case par of
     (X pnd edges) ->  store nodeMapTable (Just nd1) (X pnd (edges ++ [nd2]))
 
@@ -361,7 +363,10 @@ handleInsert nd1 nd2 = do
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)                        -- Case 1.1.2
               update_ graph1Table (return (nd2, record2{tree_parent=nd1{- , nextSibling=fc1 -}}))
               resetCounter
-              relabel 1 [] 'n'
+--              relabel 1 [] 'n'
+              reLabelAll allnodes [] 'n'
+              x <- getCounter
+              liftIO $ print $ " case 1: counter: " ++ show x
               return ()
               --liftIO $ print $ " nd :" ++ show nd1 ++ " edges : " ++ show record1
               --liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
@@ -386,7 +391,10 @@ handleInsert nd1 nd2 = do
              liftIO $ print $ "nd 1: "++show nd1 ++ " nd2 : " ++ show nd2 ++ " pr : " ++ show pre ++ " ps: " ++ show post              
              store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty)
              resetCounter
-             relabel 1 [] 'n'
+--             relabel 1 [] 'n'
+             reLabelAll (allnodes) [] 'n'
+             x <- getCounter
+             liftIO $ print $ " case 2 :  counter : " ++ show x
              {- if (ps1== max_bound) then 
                store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty)
              else 
@@ -426,6 +434,15 @@ handleInsert nd1 nd2 = do
     insertIsolatedNode = getCounter >>= \x ->incrementCounter >>incrementCounter >> return (x*gap ,(x+1) *gap)
     insert2IsolatedNodes = getCounter >>= \x ->incrementCounter >> incrementCounter >>
       incrementCounter >> incrementCounter >> return ((x*gap),(x+3)*gap,(x+1)*gap,(x+2)*gap)
+
+
+
+
+getAllNodes :: Daison [Nd]
+getAllNodes = do 
+  nodes <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
+  return nodes 
+
 
 
 
@@ -604,6 +621,27 @@ dfsearch nd1 nd2 = do
       True -> return True
       False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
 
+
+reLabelAll :: [Nd] -> [Nd] -> Char-> Daison ()
+reLabelAll  all visited t = do 
+ -- newvisited <- relabel nd1 visited t 
+--  nodes <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
+--  let graphlist = Map.toList graphmap
+--  let nodelist = map (\(x,y) -> x ) graphlist
+  let difference = all List.\\ visited
+  liftIO $ print $ " nodes :  " ++ show all
+  liftIO $ print $ " visited : " ++ show visited
+
+  liftIO $ print $ " difference : " ++ show difference
+  when (length difference > 0 ) $ do 
+    updatedVisited <-  relabel (head difference) visited t --(S "root")
+    reLabelAll all updatedVisited t
+    return ()
+  return()
+
+
+
+
 relabel :: Nd -> [Nd] -> Char-> Daison [Nd]
 relabel nd visited t =  do 
   liftIO $ print $ (" relabel, nd : ") ++ show nd ++ "  visited : " ++ show visited
@@ -619,9 +657,6 @@ relabel nd visited t =  do
            rest -> foldM (\acc y -> relabel y acc t) visited  rest
          updatePost nd 
          return (nd : nv)
-
-
-  
  
 updatePre :: Nd -> [Nd] -> Daison Bool
 updatePre nd visited = do 
@@ -632,7 +667,7 @@ updatePre nd visited = do
                                              do
                                                c_counter <- getCounter
                                                incrementCounter
-                                               update_ graph1Table (return (nd, Labels trp c_counter c_counter hp dir  ))
+                                               update_ graph1Table (return (nd, Labels trp (c_counter*gap) (c_counter*gap) hp dir  ))
                                                return False
     _ -> error "error " 
 
@@ -644,7 +679,7 @@ updatePost nd = do
       Labels trp pr ps hp dir  ->  do 
         c_counter <- getCounter
         incrementCounter
-        update_ graph1Table (return (nd, Labels trp pr c_counter hp dir ))
+        update_ graph1Table (return (nd, Labels trp pr (c_counter*gap) hp dir ))
       _   -> error "error from updatepost"
     _ -> error "error " 
 
@@ -677,180 +712,3 @@ updateDirects parent gp = do
   when (gp > 0) $ do
     ggp <- getParent gp
     when (ggp > 0) $ updateDirects parent ggp
-
-
-{- updateLabel :: Labels ->Nd ->Labels -> Nd -> Daison()
-updateLabel record@(Labels ptrp ppr pps _ _  ) nd1 record1@(Labels _ pr1 ps1 _ _ ) nd2 
-  | nd2 < 0 = do  
-    let pre1 = average ppr pps
-    let post1 = average pre1 pps
-    store graph1Table (Just nd1) record1{preL = pre1, postL =post1}
---    liftIO $ print $ " nd :" ++ show nd1 ++ " from if : " ++ show record1
-    when  (fc1 > 0 ) $
-      do 
-        res3 <- query firstRow (from graph1Table (at fc1)) 
-        updateLabel record1{preL = pre1, postL =post1} fc1 res3 (-1) 
-
-    return ()
-  | otherwise = do
-    res2 <- query firstRow (from graph1Table (at nd2))
-    case res2 of 
-      record2@(Labels _ pr2 ps2 _ _ fc2  rlc2 ns2 _) -> do 
-            let pre2 = average pps ps1
-            let post2 = average pre2 pps
-            store graph1Table (Just nd2) record2{preL = pre2, postL =post2}
---            liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
-            if (ns2 > 0) then updateLabel record nd2 record2{preL = pre2, postL =post2} ns2 else return()
-            if (fc2 > 0) then 
-              do 
-                res3 <- query firstRow (from graph1Table (at fc2)) 
-                updateLabel record2{preL = pre2, postL =post2} fc2 res3 (-1) 
-              else return()
-
-    return()
-  where 
-    average x y = x + div (y-x) 2
- -}
-
-
-{- reLabelMain :: PrePostRef -> Daison ()
-reLabelMain v  {- (PreLabel nd) -} =  do 
-  let d = 3
-  let count = 2
-  (newd, newcount,newv, begin, end) <- mainLoop d count v v v --(PreLabel nd) (PreLabel nd) (PreLabel nd)
-  reLabelRange begin end newv newd newcount
-  
-  x <- select [ x | x <- from graph1Table everything ] 
---  liftIO $  print "from relabelMain"
---  liftIO $  mapM_ (\y -> putStrLn (show y) ) x
-  return ()
-
-mainLoop :: Int64 -> Int64-> PrePostRef ->PrePostRef -> PrePostRef -> Daison (Nd, Int64, PrePostRef, PrePostRef, PrePostRef)
-mainLoop d count v begin end = do
-  --max <- getCounter
---  liftIO $ print $ " mainloop v :" ++ show v ++ "  : " ++ show begin
-  if (d <  max_bound) then 
-    do 
-      (begin1, count1, v1, d1)  <- goPrev (begin) count v d
-      (end1, count2, v2, d2)  <- goNext (end) count1 v1 d1
-      if (count2 * count2 < fromIntegral (d2 +1)  ) then 
-        return (d2, count2, v2, begin1, end1)
-      else
-        do 
-          let d3 = d2 Bits..|. (Bits.shiftL d2 1)
-          mainLoop d3 count2 v2 begin1 end1
-  else 
-    return (d, count, v, begin, end)
-
-goPrev :: PrePostRef -> Int64 -> PrePostRef -> Int64 -> Daison (PrePostRef, Int64, PrePostRef, Int64)
-goPrev begin count v d = do 
-  vlabel <- getLabel v
-  newbegin <- prevOf begin 
---  liftIO $ print $ " go new begin :" ++ show newbegin ++ " v : " ++ show v
-  newbeginLabel <- getLabel (newbegin)
---  liftIO $ print $ " goPrev :" ++ show newbeginLabel ++ "  : " ++ show (vlabel Bits..&. (Bits.complement d))
-  if (newbeginLabel > (vlabel Bits..&. (Bits.complement d))) then 
-    goPrev newbegin (count +1) v d
-  else return (begin, count, v, d)
-
-
-goNext :: PrePostRef -> Int64 -> PrePostRef -> Int64 -> Daison (PrePostRef, Int64, PrePostRef, Int64)
-goNext end count v d = do 
-  vlabel <- getLabel v
-  newend <- nextOf end
-  newendLabel <- getLabel (newend)  
---  liftIO $ print $ " goNext :" ++ show newendLabel ++ "  : " ++ show (vlabel Bits..|. d)
-  if (newendLabel < (vlabel Bits..|. d)) then 
-    goNext newend (count +1) v d
-  else return (end, count, v, d)
-
-reLabelRange :: PrePostRef -> PrePostRef -> PrePostRef -> Int64 ->Int64 -> Daison()
-reLabelRange begin end v d count = do 
-  let n = div d count
-  vlabel <- getLabel v
-  let newv = vlabel  Bits..&. (Bits.complement d )
---  liftIO $ print $ " relabelRange :" ++ show begin ++ "  : " ++ show end
-  reLabelNodes begin end newv n 1
-  return ()
-
-
-reLabelNodes begin end v n i = do 
-  if begin == end then do
---    liftIO $ print $ " relabelNodes :" ++ show begin ++ "  : " ++ show end ++ ":  " ++ show i
-    case begin of 
-      (PreLabel nd ) ->   do
-        record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
-        case record of
-          [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
-            let newlabel = v + i * n
-            update_ graph1Table (return (nd, Labels tp newlabel ps  hp dir fc lc ns ls) )
-            return()
-      (PostLabel nd ) ->   do
-        record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
-        case record of
-          [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
-            let newlabel = v + i * n
-            update_ graph1Table (return (nd, Labels tp pr newlabel   hp dir fc lc ns ls) )
-            return()
-
-    return ()
-  else do 
---    liftIO $ print $ " relabelNodes :" ++ show begin ++ "  : " ++ show end ++ ":  " ++ show i
-    case begin of 
-      (PreLabel nd ) ->   do
-        record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
-        case record of
-          [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
-            let newlabel = v + i * n
-            update_ graph1Table (return (nd, Labels tp newlabel ps  hp dir fc lc ns ls) )
-            return()
-      (PostLabel nd ) ->   do
-        record <- select [(nd, labels) | (labels) <- from graph1Table (at nd)  ] 
-        case record of
-          [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
-            let newlabel = v + i * n
-            update_ graph1Table (return (nd, Labels tp pr newlabel   hp dir fc lc ns ls) )
-            return()
-    newbegin <- nextOf (begin)
---    liftIO $ print $ " begin : " ++show begin ++ " newbegin : " ++ show newbegin
---    liftIO $ print $ " I : " ++show i ++ " n  : " ++ show n
-
-    reLabelNodes newbegin end v n (i +1)
- 
-
-getLabel :: PrePostRef -> Daison Nd
-getLabel (PreLabel nd) = do 
---  liftIO $ print $ " getprelabel : " ++show nd
-  record <- select [label1 | (label1) <- from graph1Table (at nd)  ]
-  case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> return pr
-getLabel (PostLabel nd) = do 
-  record <- select [label1 | (label1) <- from graph1Table (at nd)  ]
-  case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> return ps
-
- nextOf :: PrePostRef -> Daison PrePostRef 
-nextOf (PreLabel nd) = do 
-  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
-  case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> if fc >0 then return (PreLabel fc) 
-      else return (PostLabel nd)
-nextOf (PostLabel nd) = do 
-  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
-  case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> if ns >0 then return (PreLabel ns)  
-      else return (PostLabel trp)
-
-prevOf :: PrePostRef -> Daison PrePostRef
-prevOf (PreLabel nd) = do 
-  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
-  case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> if ls >0 then return  (PostLabel ls) 
-      else return (PreLabel trp)
-prevOf (PostLabel nd) = do 
-  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
-  case record of
-    [(Labels trp pr ps hp dir fc lc ns ls)] -> if lc >0 then  return (PostLabel lc)  
-      else return (PreLabel nd)
- -}
-

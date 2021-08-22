@@ -903,13 +903,13 @@ queryM nd1 nd2 = do
 search :: Nd -> Nd -> Daison Bool
 search nd1 nd2 = do
   label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
-  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+--  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
   case label1 of 
     [(Labels trp1 pre1 post1 hp1 dir1 fc1 lc1 ns1 ls1)] -> do
       flag <- queryM nd1 nd2
       if flag then return True
       else do
-        x <- or <$> (mapM (\x -> queryM x nd2) (Set.toList hp1)) 
+        x <- or <$> (mapM (\x -> search x nd2) (Set.toList hp1)) 
         if not x 
           then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
         else return x
