@@ -172,11 +172,6 @@ generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
 
-{- main1 :: IO ()
-main1 = do
-  quickCheck prop_graphCSearch
- -}
-
 main :: IO ()
 main = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
@@ -246,8 +241,6 @@ getNdIndex node = do
   case nod of
     [nd] -> return nd
     []   -> do 
-      --c_counter <- getCounter
-      --incrementCounter >> incrementCounter
       pkey <- insert_ nodeMapTable (X node [])
       store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty  )
       return pkey
@@ -269,13 +262,9 @@ insertNodeinDB node parent = do
       store graph1Table (Just pkey) (Labels parent_ndmp c_counter c_counter Set.empty Set.empty )    
       
       when (parent_ndmp > 0) $ do
---        parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
---        case parent_record of
---          [(indp ,(Labels ptrp ppr pps php pdir pte))] -> update_ graph1Table (return (indp,(Labels ptrp ppr pps php pdir (pkey:pte)) ))
---        parent_ndmprecord <- select [(ind,edgess) | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == parent  ]
         update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (pkey:edges_par) ) ))
 
-      return False
+      return False -- to indicate the first visit
     [nod]   ->  do
       parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
       case parent_record of 
@@ -285,10 +274,8 @@ insertNodeinDB node parent = do
               update_ graph1Table (return (indp,(Labels ptrp ppr pps (Set.insert (head map) php ) pdir) ))
               when (ptrp > 0) $ updateDirects parent_ndmp ptrp 
       update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (nod:edges_par) ) ))
+      return True -- to indicate the second visit
 
-      return True 
-{-     first : rest -> error "duplicate records in the database table, please verify"
- -}
 
 updatePost :: Nd -> Daison ()
 updatePost nd = do 
