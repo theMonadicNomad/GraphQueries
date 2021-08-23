@@ -237,7 +237,6 @@ main = do
     tryCreateTable graph1Table
     tryCreateTable counters
     tryCreateTable nodeMapTable
---    insert counters (return ( "l_max", max_bound ))
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
     let graphmap1 =  Map.fromList g
@@ -262,10 +261,7 @@ getNdIndex node = do
   case nod of
     [nd] -> return nd
     []   -> do 
-{-       c_counter <- getCounter
-      incrementCounter >> incrementCounter  -}
       pkey <- insert_ nodeMapTable (X node [])
---      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
@@ -287,7 +283,6 @@ makeDynamicOperation test_db readwritemode = do
       nd1 <- getNdIndex (C firstChar)
       nd2 <- getNdIndex (C secondChar)
       case choice of
---        'r' -> reLabelMain (PreLabel 2)
         'i' -> handleInsert nd1 nd2
         'd' -> handleDelete nd1 nd2 
         's' -> do 
@@ -366,19 +361,12 @@ handleInsert nd1 nd2 = do
               if Set.null hp1
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)                        -- Case 1.1.1
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)                        -- Case 1.1.2
-              update_ graph1Table (return (nd2, record2{tree_parent=nd1{- , nextSibling=fc1 -}}))
+              update_ graph1Table (return (nd2, record2{tree_parent=nd1}))
               resetCounter
---              relabel 1 [] 'n'
               reLabelAll allnodes [] 'n'
               x <- getCounter
               liftIO $ print $ " case 1: counter: " ++ show x
               return ()
-              --liftIO $ print $ " nd :" ++ show nd1 ++ " edges : " ++ show record1
-              --liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
-              {- TODO: - update the pre and post labels of nd2 and its children.
-                          All the labels must be moved right after PreLabel nd1.
-                       - update prevSibling for the firstChild of nd1
-                       - update firstChild for nd1 -}
           | otherwise -> do  
               liftIO $ print $ " case 1.2 :  " ++ show (nd1,res1,nd2,res2)                                                                    -- Case 1.2
               if (not (Set.null hp1) || tp1 == 0 || tp1 == nd1)
@@ -386,30 +374,15 @@ handleInsert nd1 nd2 = do
                 else do record <- query firstRow (from graph1Table (at tp1))                     -- Case 1.2.2
                         updateDirectInAncestors tp1 record (Set.insert nd1)
                         addHop nd1 record1 nd2
---              liftIO $ print $ " nd1 :" ++ show nd1 ++ " " ++ show record1
---              liftIO $ print $ " nd2 :" ++ show nd2 ++ " " ++ show record2 
               return ()
 
     ([record1@(Labels tp1 pr1 ps1 _ _  )],[]                                          ) ->  -- Case 2
           do 
              liftIO $ print $ " case 2 : " ++ show (nd1,nd2)
              (pre,post) <- insertIsolatedNode
---             liftIO $ print $ "nd 1: "++show nd1 ++ " nd2 : " ++ show nd2 ++ " pr : " ++ show pre ++ " ps: " ++ show post              
              store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty)
              resetCounter
---             relabel 1 [] 'n'
              reLabelAll (allnodes) [] 'n'
-             x <- getCounter
-
-             {- if (ps1== max_bound) then 
-               store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty)
-             else 
-               do
-                 store graph1Table (Just nd1) record1{postL= post}
-                 store graph1Table (Just nd2) (Labels nd1 ps1 pre Set.empty Set.empty)
- -}             {- TODO: - update prevSibling for the firstChild of nd1 ??
-                      - update firstChild for nd1 -}
-
              return ()
 
     ([]                                       ,[record2@(Labels tp2 _ _ hp2 dir2 )])     -- Case 3
@@ -421,9 +394,7 @@ handleInsert nd1 nd2 = do
           | otherwise -> do  
               liftIO $ print $ " case 3.2 :  " ++ show (nd1,nd2)                                                                    -- Case 3.2
               (pre,post)  <- insertIsolatedNode
-               {- TODO: insert one label after (prevOf (PreLabel nd2)) -}
-              {-post <- undefined  TODO: insert one label after (PostLabel nd2) -}
-               
+              
               let record1 = Labels 0 pre post Set.empty Set.empty 
               store graph1Table (Just nd2) record2{tree_parent=nd1}
               if Set.null hp2
@@ -585,7 +556,6 @@ updateMax newmax =   update_ counters (return (1, ("l_max", newmax) ))
 incrementCounter :: Daison ()
 incrementCounter = do
   c_counter <- getCounter  
---  liftIO $ print $ " counter current value : " ++ show (c_counter+1) 
   update_ counters (return (1, ("counter", c_counter+1) )) 
   
 
@@ -633,15 +603,7 @@ dfsearch nd1 nd2 = do
 
 reLabelAll :: [Nd] -> [Nd] -> Char-> Daison ()
 reLabelAll  all visited t = do 
- -- newvisited <- relabel nd1 visited t 
---  nodes <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
---  let graphlist = Map.toList graphmap
---  let nodelist = map (\(x,y) -> x ) graphlist
   let difference = all List.\\ visited
-{-   liftIO $ print $ " nodes :  " ++ show all
-  liftIO $ print $ " visited : " ++ show visited
-
-  liftIO $ print $ " difference : " ++ show difference -}
   when (length difference > 0 ) $ do 
     updatedVisited <-  relabel (head difference) visited t --(S "root")
     reLabelAll all updatedVisited t
