@@ -81,7 +81,7 @@ data City = City { name :: String,
   
 
 data Labels = Labels {
-    tree_parent :: Nd,
+{-     tree_parent :: Nd, -}
     pre :: Pre,
     post :: Post,
     hops :: Hops,
@@ -140,7 +140,18 @@ graph2 = Graph
 
 
 instance Show Labels where
-  show (Labels a b c d e) = "TP: " ++  show a ++ " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e 
+  show (Labels {- a -} b c d e) = {- "TP: " ++  show a ++ -} " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e 
+
+
+
+parentTable :: Table Nd
+parentTable = table "parentGraph1" `withIndex` parent_index
+
+
+parent_index :: Index Nd Nd 
+parent_index = index parentTable "parent_index" Prelude.id
+
+
 
 graph1Table :: Table (Labels)
 graph1Table = table "graph1"
@@ -194,6 +205,7 @@ main = do
     tryCreateTable graph1Table
     tryCreateTable counters
     tryCreateTable nodeMapTable
+    tryCreateTable parentTable
 {-     c_counter <- getCounter
     if (c_counter >0) then return ()
     else
@@ -203,7 +215,7 @@ main = do
     let graphmap1 =  Map.fromList g
     process graphmap1
     a <- select [ x | x <- from graph1Table everything ]
-    b <- select [ x | x <- from nodeMapTable everything ]
+    b <- select [ x | x <- from parentTable everything ]
     return (a,b)
   mapM_ (\y -> putStrLn (show y) ) a
   mapM_ (\y -> putStrLn (show y) ) b
@@ -249,7 +261,7 @@ getNdIndex node = do
       --c_counter <- getCounter
       --incrementCounter >> incrementCounter
       pkey <- insert_ nodeMapTable (X node [])
-      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty  )
+      store  graph1Table (Just pkey) (Labels {- (-1) -} (-3) (-2) Set.empty Set.empty  )
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
@@ -266,8 +278,8 @@ insertNodeinDB node parent = do
       c_counter <- getCounter
       incrementCounter
       pkey <-  insert_ nodeMapTable (X node [])
-      store graph1Table (Just pkey) (Labels parent_ndmp c_counter c_counter Set.empty Set.empty )    
-      
+      store graph1Table (Just pkey) (Labels {- parent_ndmp -} c_counter c_counter Set.empty Set.empty )    
+      store parentTable (Just pkey) parent_ndmp
       when (parent_ndmp > 0) $ do
 --        parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
 --        case parent_record of
@@ -281,9 +293,10 @@ insertNodeinDB node parent = do
       case parent_record of 
           [] -> error "error "
           [(indp, labelp)] -> case labelp of 
-            (Labels ptrp ppr pps php pdir) -> do
-              update_ graph1Table (return (indp,(Labels ptrp ppr pps (Set.insert (head map) php ) pdir) ))
-              when (ptrp > 0) $ updateDirects parent_ndmp ptrp 
+            (Labels {- ptrp -} ppr pps php pdir) -> do
+              update_ graph1Table (return (indp,(Labels {- ptrp -} ppr pps (Set.insert (head map) php ) pdir) ))
+              ptrp1 <- getParent1 parent_ndmp
+              when (ptrp1 > 0) $ updateDirects parent_ndmp ptrp1 
       update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (nod:edges_par) ) ))
 
       return True 
@@ -295,10 +308,10 @@ updatePost nd = do
   record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
   case record of 
     [(nd, label)] -> case label of
-      Labels trp pr ps hp dir  ->  do 
+      Labels {- trp -} pr ps hp dir  ->  do 
         c_counter <- getCounter
         incrementCounter
-        update_ graph1Table (return (nd, Labels trp pr c_counter hp dir ))
+        update_ graph1Table (return (nd, Labels {- trp -} pr c_counter hp dir ))
       _   -> error "error from updatepost"
     _ -> error "error " 
 
@@ -307,15 +320,15 @@ updateDirects parent gp = do
   record <- select [(gp,label1) | (label1) <- from graph1Table (at gp)  ] 
   case record of 
     [(nd, label)] -> case label of
-      Labels trp pr ps hp dir ->  do
-        update_ graph1Table (return (nd, Labels trp pr ps hp (Set.insert parent dir) ))
+      Labels {- trp -} pr ps hp dir ->  do
+        update_ graph1Table (return (nd, Labels {- trp -} pr ps hp (Set.insert parent dir) ))
       _ -> error "updatedirects error"
     _   -> liftIO $ print record
   when (gp /= 0) $ do
-    ggp <- getParent gp
+    ggp <- getParent1 gp
     when (ggp /= 0) $ updateDirects parent ggp
 
-getParent :: Nd -> Daison Nd
+{- getParent :: Nd -> Daison Nd
 getParent node = do
   record <- select [(node, labels) | (labels) <- from graph1Table (at node) ] 
   case record of
@@ -323,6 +336,15 @@ getParent node = do
     [(ind1,  label1)] -> case label1 of 
       (Labels trp _ _ _ _ ) -> return trp
     _           -> error "multiple parents error "
+ -}
+getParent1 :: Nd -> Daison Nd
+getParent1 node = do
+  record <- select [parent | parent <- from parentTable (at node) ] 
+  case record of
+    [] -> error $ "invalid parent node :" ++ show node
+    [par] ->  return par
+    _           -> error "multiple parents error "
+
  
 getCounter :: Daison Int
 getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
@@ -344,9 +366,9 @@ queryM nd1 nd2 = do
   label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
   label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
   case label1 of 
-    [(Labels trp1 pre1 post1 hp1 dir1)] -> do
+    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
       case label2 of
-        [(Labels trp2 pre2 post2 hp2 dir2)] -> if  (pre1 < post2 && post2 <= post1) then return True
+        [(Labels {- trp2 -} pre2 post2 hp2 dir2)] -> if  (pre1 < post2 && post2 <= post1) then return True
                                              else return False
         _ -> error "error "                
     _ -> error "error again "
@@ -357,7 +379,7 @@ search nd1 nd2 = do
   label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
   label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
   case label1 of 
-    [(Labels trp1 pre1 post1 hp1 dir1)] -> do
+    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
       flag <- queryM nd1 nd2
       if flag then return True
       else do
