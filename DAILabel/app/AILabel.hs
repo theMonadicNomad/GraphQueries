@@ -276,7 +276,7 @@ insertNodeinDB node parent = do
       when (parent_ndmp > 0) $ do
         update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (pkey:edges_par) ) ))
 
-      return False
+      return False -- Inserting the node on the first visit
     [nod]   ->  do
       parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
       case parent_record of 
@@ -284,10 +284,10 @@ insertNodeinDB node parent = do
           [(indp, labelp)] -> case labelp of 
             (Labels ppr pps php pdir) -> do
               update_ graph1Table (return (indp,(Labels ppr pps (Set.insert (head map) php ) pdir) ))
-              ptrp1 <- getParent1 parent_ndmp
-              when (ptrp1 > 0) $ updateDirects parent_ndmp ptrp1 
+              ptrp <- getParent parent_ndmp
+              when (ptrp > 0) $ updateDirects parent_ndmp ptrp
       update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (nod:edges_par) ) ))
-      return True 
+      return True --updating hops and directs if it is not the first visit
 
 updatePost :: Nd -> Daison ()
 updatePost nd = do 
@@ -311,20 +311,11 @@ updateDirects parent gp = do
       _ -> error "updatedirects error"
     _   -> liftIO $ print record
   when (gp /= 0) $ do
-    ggp <- getParent1 gp
+    ggp <- getParent gp
     when (ggp /= 0) $ updateDirects parent ggp
 
-{- getParent :: Nd -> Daison Nd
+getParent :: Nd -> Daison Nd
 getParent node = do
-  record <- select [(node, labels) | (labels) <- from graph1Table (at node) ] 
-  case record of
-    [] -> error $ "invalid parent node :" ++ show node
-    [(ind1,  label1)] -> case label1 of 
-      (Labels trp _ _ _ _ ) -> return trp
-    _           -> error "multiple parents error "
- -}
-getParent1 :: Nd -> Daison Nd
-getParent1 node = do
   record <- select [parent | parent <- from parentTable (at node) ] 
   case record of
     [] -> error $ "invalid parent node :" ++ show node
