@@ -350,15 +350,12 @@ processNodes :: GraphMap Node -> Node -> Node -> Daison()
 processNodes graph node parent_node = do
   nd <- getNdIndex node
   parent <- getNdIndex parent_node
-  par <-  query firstRow (from nodeMapTable (at parent))
-  liftIO $ print $ "FROM PROCESS Node: " ++ show node ++ " nd : " ++ show nd ++ " parent : " ++ show parent ++ " par: "++ show par
- 
+  par <-  query firstRow (from nodeMapTable (at parent)) 
   case par of
     (X pnd edges) -> case (List.elem nd edges ) of
       True -> return ()
       False -> when (parent /= nd) $ handleInsert  parent nd   
   let adjacent = Map.lookup node graph
-  liftIO $ print $ "Adjacent nd,  " ++ show (node, adjacent)
   case adjacent of
       Nothing      -> return () 
       Just []   -> return ()
@@ -378,7 +375,6 @@ handleInsert nd1 nd2 = do
 
     ([record1@(Labels tp1 _ _ hp1 _  )],[record2@(Labels tp2 _ _ hp2 dir2  )])   -- Case 1
           | tp2 == 0 -> do            
-              liftIO $ print $ " case 1.1 :  " ++ show (nd1,nd2)                                                         -- Case 1.1
               if Set.null hp1
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)                        -- Case 1.1.1
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)                        -- Case 1.1.2
@@ -386,10 +382,8 @@ handleInsert nd1 nd2 = do
               resetCounter
               reLabelAll allnodes [] 'n'
               x <- getCounter
-              liftIO $ print $ " case 1: counter: " ++ show x
               return ()
           | otherwise -> do  
-              liftIO $ print $ " case 1.2 :  " ++ show (nd1,res1,nd2,res2)                                                                    -- Case 1.2
               if (not (Set.null hp1) || tp1 == 0 || tp1 == nd1)
                 then addHop nd1 record1 nd2                                                      -- Case 1.2.1
                 else do record <- query firstRow (from graph1Table (at tp1))                     -- Case 1.2.2
@@ -399,7 +393,6 @@ handleInsert nd1 nd2 = do
 
     ([record1@(Labels tp1 pr1 ps1 _ _  )],[]                                          ) ->  -- Case 2
           do 
-             liftIO $ print $ " case 2 : " ++ show (nd1,nd2)
              (pre,post) <- insertIsolatedNode
              store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty)
              resetCounter
@@ -408,12 +401,10 @@ handleInsert nd1 nd2 = do
 
     ([]                                       ,[record2@(Labels tp2 _ _ hp2 dir2 )])     -- Case 3
           | tp2 > 0   -> do              
-              liftIO $ print $ " case 3.1 :  " ++ show (nd1,nd2)                                                      -- Case 3.1
               (pre,post)  <- insertIsolatedNode {- TODO: insert two labels after (PreLabel root), root == 0 -}
               store graph1Table (Just nd1) (Labels 0 pre post (Set.singleton nd2) Set.empty)
               return ()
           | otherwise -> do  
-              liftIO $ print $ " case 3.2 :  " ++ show (nd1,nd2)                                                                    -- Case 3.2
               (pre,post)  <- insertIsolatedNode
               
               let record1 = Labels 0 pre post Set.empty Set.empty 
@@ -423,13 +414,12 @@ handleInsert nd1 nd2 = do
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)
 
     ([]                                       ,[]                                          ) ->  -- Case 4
-          do liftIO $ print $ " case 4 :  " ++ show (nd1,nd2)
+          do 
              (pre1,pre2,post1,post2) <- insert2IsolatedNodes {- TODO: insert four labels after (PreLabel root) -}
              store graph1Table (Just nd1) (Labels 0   pre1 post1 Set.empty Set.empty )
              store graph1Table (Just nd2) (Labels nd1 pre2 post2 Set.empty Set.empty )
              return ()
   return()
---  store nodeMapTable (Just parent) (X pnd (List.nub (nd:edges)))
   where 
     average x y = x + div (y-x) 2
     insertIsolatedNode = getCounter >>= \x ->incrementCounter >>incrementCounter >> return (x*gap ,(x+1) *gap)
@@ -635,14 +625,12 @@ reLabelAll  all visited t = do
 
 relabel :: Nd -> [Nd] -> Char-> Daison [Nd]
 relabel nd visited t =  do 
-{-   liftIO $ print $ (" relabel, nd : ") ++ show nd ++ "  visited : " ++ show visited -}
   x <- updatePre nd visited
   if x then return visited
        else do
          edges <- if t == 's' then getTreeEdges nd else getEdges nd
          --getTree Edges is used to relabel the spanning tree when an edge is deleted in case 1
          --getEdges is used to relabel the whole spanning tree
-{-          liftIO $ print $ " nd :" ++ show nd ++ " edges : " ++ show edges -}
          nv <- case edges of
            [] -> return visited
            rest -> foldM (\acc y -> relabel y acc t) visited  rest
