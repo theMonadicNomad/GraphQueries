@@ -16,6 +16,7 @@ library:
     - bytestring
     - containers
     - random
+    - criterion
   include-dirs: src/c
 
     
@@ -28,11 +29,12 @@ library:
   build-tools: hsc2hs
 
 executables:
-  dailabel-exe:
-    main: DAILabel.hs
+  main-exe:
+    main: MainProject.hs
     other-modules:
-#      AILabelToDynamic
-#      DAILabel
+      AILabel
+      DAILabel
+      DAILabelModified
       Paths_daison
 
     source-dirs: app
@@ -40,6 +42,7 @@ executables:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
+      - -O2
     dependencies:
       - daison
       - containers
@@ -47,41 +50,4 @@ executables:
       - QuickCheck
       - process
       - random
-  ailabel-exe:
-    main: AILabel.hs
-    other-modules:
-#      AILabelToDynamic
-#      DAILabel
-      Paths_daison
-
-    source-dirs: app
-    ghc-options:
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-    dependencies:
-      - daison
-      - containers
-      - ghc-prim
-      - QuickCheck
-      - process
-      - random
-  mdailabel-exe:
-    main: DAILabelModified.hs
-    other-modules:
-#      AILabelToDynamic
-#      DAILabel
-      Paths_daison
-
-    source-dirs: app
-    ghc-options:
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-    dependencies:
-      - daison
-      - containers
-      - ghc-prim
-      - QuickCheck
-      - process
-      - random
+      - criterion

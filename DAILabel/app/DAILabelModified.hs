@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Main where
+module DAILabelModified where
 import System.Random
 import           Database.Daison
 import           System.Environment
@@ -228,7 +228,7 @@ counters = table "counter"
 counter_index :: Index (String, Nd) String
 counter_index = index counters "counter_index" fst
 
-databaseTest = "test1.db"
+databaseTest = "mdailabel.db"
 
 
 
@@ -295,6 +295,30 @@ main = do
   mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
+
+main1  :: Int64 -> Double -> IO ()
+main1 n d= do
+  IO.hSetBuffering IO.stdin IO.NoBuffering
+  let Graph g1 = generateGraph n d
+  print $ show g1
+  db <- openDB databaseTest
+  (a,b)  <- runDaison db ReadWriteMode $ do
+    tryCreateTable graph1Table
+    tryCreateTable counters
+    tryCreateTable nodeMapTable
+    insert counters (return ( "counter", 0 ))
+    let Graph g = graph5
+    let graphmap1 =  Map.fromList g 
+    dynamicProcess graphmap1 
+    a <- select [ x | x <- from graph1Table everything ]
+    b <- select [ x | x <- from nodeMapTable everything ]
+    return (a,b)
+  putStrLn "FROM dailabel modified"
+  mapM_ (\y -> putStrLn (show y) ) a
+  mapM_ (\y -> putStrLn (show y) ) b
+  closeDB db
+  makeDynamicOperation databaseTest ReadWriteMode
+
 
 generateGraph :: Int64 -> Double ->Graph Node
 generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]

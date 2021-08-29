@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Main where 
+module AILabel where 
 
 import           Database.Daison
 import           System.Environment
@@ -173,7 +173,7 @@ counters = table "counter"
 counter_index :: Index (String, Int) String
 counter_index = index counters "counter_index" fst
 
-databaseTest = "test1.db"
+databaseTest = "ailabel.db"
 
 
 generateGraph :: Int64 -> Double ->Graph Node
@@ -187,25 +187,12 @@ generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
 main :: IO ()
 main = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
-{-   putStrLn ("Enter the number of nodes : ")
-  inp_1 <- getLine
-  putStrLn (" Enter the density : ")
-  inp_2 <- getLine
-  let n = (read inp_1 :: Int64)
-  let d = (read inp_2 :: Double)
-  let Graph g1 = generateGraph n d
-  print $ show g1
- -}
   db <- openDB databaseTest
   (a,b)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable counters
     tryCreateTable nodeMapTable
-    tryCreateTable parentTable
-{-     c_counter <- getCounter
-    if (c_counter >0) then return ()
-    else
-      do  -}     
+    tryCreateTable parentTable     
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
     let graphmap1 =  Map.fromList g
@@ -217,7 +204,28 @@ main = do
   mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
 
-    
+main1 :: Int64 -> Double -> IO ()
+main1 n d = do
+  IO.hSetBuffering IO.stdin IO.NoBuffering
+  db <- openDB databaseTest
+  (a,b)  <- runDaison db ReadWriteMode $ do
+    tryCreateTable graph1Table
+    tryCreateTable counters
+    tryCreateTable nodeMapTable
+    tryCreateTable parentTable
+    insert counters (return ( "counter", 0 ))
+    let Graph g1 = generateGraph n d
+    let Graph g = graph2
+    let graphmap1 =  Map.fromList g1
+    process graphmap1
+    liftIO $ print $ " From AILabel " 
+    a <- select [ x | x <- from graph1Table everything ]
+    b <- select [ x | x <- from parentTable everything ]
+    return (a,b)
+  mapM_ (\y -> putStrLn (show y) ) a
+  mapM_ (\y -> putStrLn (show y) ) b
+  closeDB db
+
 process :: GraphMap Node-> Daison ()
 process graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap

@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Main where
+module DAILabel where
 
 import System.Random
 import           Database.Daison
@@ -187,9 +187,9 @@ counters = table "counter"
 counter_index :: Index (String, Nd) String
 counter_index = index counters "counter_index" fst
 
-databaseTest = "test1.db"
+databaseTest = "dailabel.db"
 
-gap = 1000
+gap = 1
 
 
 instance Arbitrary (Graph Nd) where
@@ -250,6 +250,32 @@ main = do
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
+
+main1 :: Int64 -> Double -> IO ()
+main1 n d = do
+  IO.hSetBuffering IO.stdin IO.NoBuffering
+  let Graph g1 = generateGraph n d
+  print $ show g1 
+  db <- openDB databaseTest
+  (a,b)  <- runDaison db ReadWriteMode $ do
+    tryCreateTable graph1Table
+    tryCreateTable counters
+    tryCreateTable nodeMapTable
+    insert counters (return ( "counter", 0 ))
+    let Graph g = graph2
+    let graphmap1 =  Map.fromList g
+    dynamicProcess graphmap1 
+    a <- select [ x | x <- from graph1Table everything ]
+    b <- select [ x | x <- from nodeMapTable everything ]
+    return (a,b)
+  putStrLn "FROM dailabel"
+  mapM_ (\y -> putStrLn (show y) ) a
+  mapM_ (\y -> putStrLn (show y) ) b
+  closeDB db
+  makeDynamicOperation databaseTest ReadWriteMode
+
+
+
 generateGraph :: Int64 -> Double ->Graph Node
 generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
     where 
@@ -276,8 +302,6 @@ makeDynamicOperation test_db readwritemode = do
     firstChar <- getChar
     putStrLn (" Enter the second node : ")
     secondChar <- getChar
---    let firstChar = 'k'
---    let secondChar = 'l'
     db <- openDB test_db  
     (a,b) <- runDaison db readwritemode $ do 
       nd1 <- getNdIndex (C firstChar)
@@ -301,9 +325,6 @@ makeDynamicOperation test_db readwritemode = do
 dynamicProcess :: GraphMap Node -> Daison ()
 dynamicProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
-{-   store nodeMapTable (Just 0) (X (S "root" ) [])
-  store graph1Table (Just 0) (Labels 0 0 max_bound Set.empty Set.empty )    
- -}   
   processNodes graphmap firstnode firstnode --(S "root")
   processRemainingNodes graphmap
 
@@ -413,8 +434,7 @@ handleInsert nd1 nd2 = do
     average x y = x + div (y-x) 2
     insertIsolatedNode = getCounter >>= \x ->incrementCounter >>incrementCounter >> return (x*gap ,(x+1) *gap)
     insert2IsolatedNodes = getCounter >>= \x ->incrementCounter >> incrementCounter >>
-      incrementCounter >> incrementCounter >> return ((x*gap),(x+3)*gap,(x+1)*gap,(x+2)*gap)
-
+      incrementCounter >> incrementCounter >> return ((x*gap),(x+1)*gap,(x+2)*gap,(x+3)*gap)
 
 
 
