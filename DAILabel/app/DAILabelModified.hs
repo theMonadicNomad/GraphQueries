@@ -308,7 +308,7 @@ main1 n d= do
     tryCreateTable nodeMapTable
     insert counters (return ( "counter", 0 ))
     let Graph g = graph5
-    let graphmap1 =  Map.fromList g 
+    let graphmap1 =  Map.fromList g1 
     dynamicProcess graphmap1 
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
