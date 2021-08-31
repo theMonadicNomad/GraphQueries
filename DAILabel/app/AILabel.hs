@@ -33,11 +33,11 @@ type Directs = Set Nd
 type Pre = Int
 type Post = Int
 --type Graph =  [(Ndc, [Ndc])]
-data Graph a = Graph [(!a, [!a])] 
+data Graph a = Graph [(a, [a])] 
   deriving Show
 
 
-type GraphMap a = Map !a [!a]
+type GraphMap a = Map a [a]
 type Special = Bool
 type Record = (Nd, Labels)
 type Edges = [Nd]
@@ -82,16 +82,16 @@ data City = City { name :: String,
 
 data Labels = Labels {
 {-     tree_parent :: Nd, -}
-    pre :: !Pre,
-    post :: !Post,
-    hops :: !Hops,
-    directs :: !Directs
+    pre :: Pre,
+    post :: Post,
+    hops :: Hops,
+    directs :: Directs
 } deriving (Typeable, Data )
 
 --type Y = X Special2
 
-data X = X { nd :: !Node,  
-     edges :: !Edges
+data X = X { nd :: Node,  
+     edges :: Edges
 } deriving (Typeable, Data, Show)
 
 
@@ -101,7 +101,7 @@ data X = X { nd :: !Node,
 } deriving (Typeable, Data, Show)
  -}
 
-data Node = C !Ndc | I !Nd | S !Nds deriving (Eq,Data, Ord, Show)
+data Node = C Ndc | I Nd | S Nds deriving (Eq,Data, Ord, Show)
 
 
 isChar :: Node -> Bool
