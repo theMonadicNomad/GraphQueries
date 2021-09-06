@@ -48,6 +48,7 @@ executable main-exe
     , containers
     , criterion
     , daison
+    , directory
     , ghc-prim
     , process
     , random

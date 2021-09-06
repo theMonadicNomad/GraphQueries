@@ -18,10 +18,12 @@ import Control.Monad.IO.Class
 import qualified System.IO as IO
 import Test.QuickCheck 
 import Test.QuickCheck.Monadic
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
 import System.Process (callProcess, callCommand)
+import System.Directory
 import Data.Int
 import System.Random
+import Debug.Trace
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -139,39 +141,19 @@ graph2 = Graph
 
 
 instance Show Labels where
-  show (Labels b c d e) =  " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e 
-
-
-
-parentTable :: Table Nd
-parentTable = table "parentGraph1" `withIndex` parent_index
-
-
-parent_index :: Index Nd Nd 
-parent_index = index parentTable "parent_index" Prelude.id
-
+  show (Labels {- a -} b c d e) = {- "TP: " ++  show a ++ -} " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e 
 
 
 graph1Table :: Table (Labels)
 graph1Table = table "graph1"
-            `withIndex` graph_index
-
-graph_index :: Index Labels Labels 
-graph_index = index graph1Table "node_index" Prelude.id
 
 nodeMapTable :: Table X
 nodeMapTable = table "nodemap" `withIndex` nodemap_index
 
-
+--nodemap_index :: Index Y Special2
 nodemap_index :: Index X Node
 nodemap_index = index nodeMapTable "nodemap_index" nd
 
-counters :: Table (String, Int)
-counters = table "counter" 
-             `withIndex` counter_index
-
-counter_index :: Index (String, Int) String
-counter_index = index counters "counter_index" fst
 
 databaseTest = "ailabel.db"
 
@@ -182,168 +164,61 @@ generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
 
-
-
-main :: IO ()
-main = do
-  IO.hSetBuffering IO.stdin IO.NoBuffering
-  db <- openDB databaseTest
-  (a,b)  <- runDaison db ReadWriteMode $ do
-    tryCreateTable graph1Table
-    tryCreateTable counters
-    tryCreateTable nodeMapTable
-    tryCreateTable parentTable     
-    insert counters (return ( "counter", 0 ))
-    let Graph g = graph2
-    let graphmap1 =  Map.fromList g
-    process graphmap1
-    a <- select [ x | x <- from graph1Table everything ]
-    b <- select [ x | x <- from parentTable everything ]
-    return (a,b)
-  mapM_ (\y -> putStrLn (show y) ) a
-  mapM_ (\y -> putStrLn (show y) ) b
-  closeDB db
-
 main1 :: Int64 -> Double -> IO ()
 main1 n d = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
+  let Graph g1 = generateGraph n d
+  let Graph g = graph2
+  let graphmap1 | n == 0 = Map.fromList g
+                  | otherwise = Map.fromList g1
+  print $ show graphmap1
+  removeFile databaseTest
+
   db <- openDB databaseTest
-  (a,b)  <- runDaison db ReadWriteMode $ do
+  (x,y) <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
-    tryCreateTable counters
     tryCreateTable nodeMapTable
-    tryCreateTable parentTable
-    insert counters (return ( "counter", 0 ))
-    let Graph g1 = generateGraph n d
-    let Graph g = graph2
-    let graphmap1 =  Map.fromList g1
+
     process graphmap1
-    liftIO $ print $ " From AILabel " 
-    a <- select [ x | x <- from graph1Table everything ]
-    b <- select [ x | x <- from parentTable everything ]
-    return (a,b)
-  mapM_ (\y -> putStrLn (show y) ) a
-  mapM_ (\y -> putStrLn (show y) ) b
+
+    x<-select (from graph1Table everything)
+    y<-select (from nodeMapTable everything)
+    return (x,y)
+
+  putStrLn "-------------------"
+  mapM_ print x
+  mapM_ print y
+
   closeDB db
 
+
+    
 process :: GraphMap Node-> Daison ()
-process graphmap = do
-  let firstnode = fst $ Map.elemAt 0 graphmap
-  processNodes graphmap firstnode firstnode
-  processRemainingNodes graphmap
+process graph = do
+  foldM_ (\index x -> do (index',id,is_tree) <- processNodes graph index x
+                         return index')
+         0
+         (Map.toList graph)
 
-processRemainingNodes :: GraphMap Node -> Daison ()
-processRemainingNodes graphmap = do 
-  nodes <- select [nd | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
-  let graphlist = Map.toList graphmap
-  let nodelist = map (\(x,y) -> x ) graphlist
-  let difference = nodelist List.\\ nodes
-  liftIO $ print $ " nodes :  " ++ show nodes
-  liftIO $ print $ " difference : " ++ show difference
-  liftIO $ print $ " nodelist : " ++ show nodelist
-  when (length difference > 0 ) $ do 
-    processNodes graphmap (head difference) (head difference)
-    processRemainingNodes graphmap
-  return()
-
-processNodes :: GraphMap Node -> Node -> Node -> Daison()
-processNodes graph nd parent = do
-  x <- insertNodeinDB nd parent
-  unless x $ do
-    let adjacent = Map.lookup nd graph
-    case adjacent of
-      Nothing -> return ()
-      Just []      -> return ()
-      Just rest    -> mapM_ (\x -> processNodes graph x nd ) rest
-    getNdIndex nd >>= \nd1 -> updatePost nd1
-
-getNdIndex node = do
-  nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
-  case nod of
-    [nd] -> return nd
-    []   -> do 
-      pkey <- insert_ nodeMapTable (X node [])
-      store  graph1Table (Just pkey) (Labels (-3) (-2) Set.empty Set.empty  )
-      return pkey
-    _    -> error $ "ivalid getindex nd :" ++ show nod
-
-insertNodeinDB :: Node -> Node -> Daison Bool
-insertNodeinDB node parent = do
-  map <- select [ind | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == node  ]
-  par <- if (node == parent) then return [(0,(S "root",[]))] else select [(ind,(nd, edgess)) | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == parent  ] 
-  let parent_ndmp = fst . head $ par
-  let edges_par = snd . snd . head $ par 
-  let parent_ndc = fst . snd . head $ par
-  case map of
-    [] -> do
-      c_counter <- getCounter
-      incrementCounter
-      pkey <-  insert_ nodeMapTable (X node [])
-      store graph1Table (Just pkey) (Labels c_counter c_counter Set.empty Set.empty )    
-      store parentTable (Just pkey) parent_ndmp
-      when (parent_ndmp > 0) $ do
-        update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (pkey:edges_par) ) ))
-
-      return False -- Inserting the node on the first visit
-    [nod]   ->  do
-      parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
-      case parent_record of 
-          [] -> error "error "
-          [(indp, labelp)] -> case labelp of 
-            (Labels ppr pps php pdir) -> do
-              update_ graph1Table (return (indp,(Labels ppr pps (Set.insert (head map) php ) pdir) ))
-              ptrp <- getParent parent_ndmp
-              when (ptrp > 0) $ updateDirects parent_ndmp ptrp
-      update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (nod:edges_par) ) ))
-      return True --updating hops and directs if it is not the first visit
-
-updatePost :: Nd -> Daison ()
-updatePost nd = do 
-  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels pr ps hp dir  ->  do 
-        c_counter <- getCounter
-        incrementCounter
-        update_ graph1Table (return (nd, Labels pr c_counter hp dir ))
-      _   -> error "error from updatepost"
-    _ -> error "error " 
-
-updateDirects :: Nd -> Nd -> Daison()
-updateDirects parent gp = do
-  record <- select [(gp,label1) | (label1) <- from graph1Table (at gp)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels pr ps hp dir ->  do
-        update_ graph1Table (return (nd, Labels pr ps hp (Set.insert parent dir) ))
-      _ -> error "updatedirects error"
-    _   -> liftIO $ print record
-  when (gp /= 0) $ do
-    ggp <- getParent gp
-    when (ggp /= 0) $ updateDirects parent ggp
-
-getParent :: Nd -> Daison Nd
-getParent node = do
-  record <- select [parent | parent <- from parentTable (at node) ] 
-  case record of
-    [] -> error $ "invalid parent node :" ++ show node
-    [par] ->  return par
-    _           -> error "multiple parents error "
-
- 
-getCounter :: Daison Int
-getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
-
-incrementCounter :: Daison ()
-incrementCounter = do
-  c_counter <- getCounter  
-  liftIO $ print $ " counter current value : " ++ show (c_counter+1) 
-  update_ counters (return (1, ("counter", c_counter+1) )) 
-  
-
-
-resetCounter :: Daison ()
-resetCounter = update_ counters (return (1, ("counter", 0) ))
+processNodes :: GraphMap Node -> Int -> (Node,[Node]) -> Daison (Int,Nd,Maybe [Nd])
+processNodes graph index (nd,edges) = do
+  res <- select (from nodemap_index (at nd))
+  case res of
+    []   -> do (index1,tree_edges,dirs0,hops) <-
+                  foldM (\(i,tree_edges,dirs,hops) child -> do
+                              let edges = fromMaybe [] (Map.lookup child graph)
+                              (i,id,is_tree) <- processNodes graph i (child,edges)
+                              case is_tree of
+                                Nothing    -> return (i,tree_edges,dirs,id:hops)
+                                Just dirs' -> return (i,id:tree_edges,dirs'++dirs,hops))
+                        (index+1,[],[],[])
+                        edges
+               id <- store nodeMapTable Nothing (X nd (tree_edges++hops))
+               let dirs | null hops = dirs0
+                        | otherwise = id:dirs0
+               store graph1Table (Just id) (Labels index index1 (Set.fromList hops) (Set.fromList dirs))
+               return (index1+1,id,Just dirs)
+    [id] -> return (index,id,Nothing)
 
 
 queryM :: Nd -> Nd -> Daison Bool
@@ -351,9 +226,9 @@ queryM nd1 nd2 = do
   label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
   label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
   case label1 of 
-    [(Labels pre1 post1 hp1 dir1)] -> do
+    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
       case label2 of
-        [(Labels pre2 post2 hp2 dir2)] -> if  (pre1 < post2 && post2 <= post1) then return True
+        [(Labels {- trp2 -} pre2 post2 hp2 dir2)] -> if  (pre1 < post2 && post2 <= post1) then return True
                                              else return False
         _ -> error "error "                
     _ -> error "error again "
@@ -364,7 +239,7 @@ search nd1 nd2 = do
   label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
   label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
   case label1 of 
-    [(Labels pre1 post1 hp1 dir1)] -> do
+    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
       flag <- queryM nd1 nd2
       if flag then return True
       else do

@@ -19,6 +19,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Monadic
 import Data.Maybe (fromJust)
 import System.Process (callProcess, callCommand)
+import System.Directory
 import qualified Data.Bits as Bits
 import Data.Int
 
@@ -202,6 +203,17 @@ graph5 = Graph
 
 
 
+graph6 :: Graph Node
+graph6 = Graph
+    [ ( C 'a',  [ C 'b', C 'c']  ),
+      ( C 'b', [] ),
+      ( C 'c', [] ),
+      ( C 'd', [C 'e', C 'f' ] ),
+      ( C 'e', [] ),
+      ( C 'f', [] )
+    ]
+
+
 instance Show Labels where
   show (Labels a b c d e f g h i) = "TP: " ++  show a ++   " Pre: " ++ show b ++
    " Post:  " ++  show c   ++   " Hops: " ++ show d ++ " Directs:  " ++ show e ++
@@ -221,12 +233,6 @@ nodeMapTable = table "nodemap" `withIndex` nodemap_index
 nodemap_index :: Index X Node
 nodemap_index = index nodeMapTable "nodemap_index" nd
 
-counters :: Table (String, Nd)
-counters = table "counter" 
-             `withIndex` counter_index
-
-counter_index :: Index (String, Nd) String
-counter_index = index counters "counter_index" fst
 
 databaseTest = "mdailabel.db"
 
@@ -279,10 +285,7 @@ main = do
   db <- openDB databaseTest
   (a,b)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
-    tryCreateTable counters
     tryCreateTable nodeMapTable
---    insert counters (return ( "l_max", max_bound ))
-    insert counters (return ( "counter", 0 ))
     let Graph g = graph5
     let graphmap1 =  Map.fromList g
     --if (process_char == 'd') then 
@@ -298,17 +301,17 @@ main = do
 
 main1  :: Int64 -> Double -> IO ()
 main1 n d= do
+  removeFile databaseTest
   IO.hSetBuffering IO.stdin IO.NoBuffering
   let Graph g1 = generateGraph n d
   print $ show g1
   db <- openDB databaseTest
   (a,b)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
-    tryCreateTable counters
     tryCreateTable nodeMapTable
-    insert counters (return ( "counter", 0 ))
-    let Graph g = graph5
-    let graphmap1 =  Map.fromList g1 
+    let Graph g = graph6
+    let graphmap1 | n == 0 = Map.fromList g
+                  | otherwise = Map.fromList g1
     dynamicProcess graphmap1 
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
@@ -331,8 +334,6 @@ getNdIndex node = do
   case nod of
     [nd] -> return nd
     []   -> do 
-{-       c_counter <- getCounter
-      incrementCounter >> incrementCounter  -}
       pkey <- insert_ nodeMapTable (X node [])
 --      store  graph1Table (Just pkey) (Labels (-1) (-3) (-2) Set.empty Set.empty (-100) (-100) (-100) (-100)  )
       return pkey
@@ -364,7 +365,6 @@ makeDynamicOperation test_db readwritemode = do
           liftIO $ print  $ " search result : " ++ show flag
         'r' ->  do
           dropTable graph1Table
-          dropTable counters
           dropTable nodeMapTable
           liftIO main
       x <- select [ x | x <- from graph1Table everything ] 
@@ -380,7 +380,7 @@ dynamicProcess :: GraphMap Node -> Daison ()
 dynamicProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
   store nodeMapTable (Just 0) (X (S "root" ) [])
-  store graph1Table (Just 0) (Labels 0 0 max_bound Set.empty Set.empty (-100) (-100) (-100) (-100) )    
+  store graph1Table (Just 0) (Labels (-1) 0 max_bound Set.empty Set.empty (-100) (-100) (-100) (-100) )    
   processNodes graphmap firstnode (S "root")
   processRemainingNodes graphmap
 
@@ -416,7 +416,7 @@ processNodes graph node parent_node = do
       Just rest    ->do
         mapM_ (\x -> processNodes graph x node ) rest
 
-updateLabel :: Labels ->Nd ->Labels -> Nd -> Daison()
+{- updateLabel :: Labels ->Nd ->Labels -> Nd -> Daison()
 updateLabel record@(Labels ptrp ppr pps _ _ pfc flc pns pls ) nd1 record1@(Labels _ pr1 ps1 _ _ fc1  rlc1 ns1 _) nd2 
   | nd2 < 0 = do  
     let pre1 = average ppr pps
@@ -447,7 +447,49 @@ updateLabel record@(Labels ptrp ppr pps _ _ pfc flc pns pls ) nd1 record1@(Label
 
     return()
   where 
-    average x y = x + div (y-x) 2
+    average x y = x + div (y-x) 2  -}
+
+
+
+{- updateLabel :: Labels ->Nd ->Labels -> Nd -> Daison()
+updateLabel record@(Labels ptrp ppr pps _ _ pfc flc pns pls ) nd1 record1@(Labels _ pr1 ps1 _ _ fc1  rlc1 ns1 _) nd2 
+  | nd2 < 0 = do  
+    a <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
+    let pre1 = average a ps1
+    let post1 = average pre1 ps1
+    store graph1Table (Just nd1) record1{preL = pre1, postL =post1}
+    when (ns1>0) $  updateLabel record nd1 record1{preL = pre1, postL =post1} ns1 
+    when  (fc1 > 0 ) $
+      do 
+        res3 <- query firstRow (from graph1Table (at fc1)) 
+        updateLabel record1{preL = pre1, postL =post1} fc1 res3 (-1)  
+    return()
+  where 
+    average x y = x + div (y-x) 2 
+ -}
+
+
+updateLabel :: Nd -> Daison ()
+updateLabel nd = do
+  liftIO $ print $ " update label nd :" ++ show nd
+  prev <- prevOf (PreLabel nd) >>= \x -> getLabel x 
+  res <- query firstRow (from graph1Table (at nd))
+  case res of
+    Labels tp pr ps hp dir fc lc ns ls -> do
+      post <- getLabel (PostLabel tp)
+      let pr = average prev post
+      let ps = average pr post
+      update_ graph1Table (return (nd, res{preL = pr, postL = ps}))
+      next <- nextNode nd
+      when (next > 0) $ 
+        do
+          updateLabel next
+          liftIO $ print $ " nd :" ++ show nd++ " label : " ++ show res ++ " next : " ++ show next
+          return ()
+  return()
+  where 
+    average x y = x + div (y-x) 2 
+ 
 
 handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
@@ -456,7 +498,7 @@ handleInsert nd1 nd2 = do
   
   case (res1,res2) of
 
-    ([record1@(Labels tp1 _ _ hp1 _ fc1 lc1 _ _ )],[record2@(Labels tp2 _ _ hp2 dir2 _ _ ns2 ls2 )])   -- Case 1
+    ([record1@(Labels tp1 pr1 ps1 hp1 _ fc1 lc1 _ _ )],[record2@(Labels tp2 pr2 ps2 hp2 dir2 fc2 _ ns2 ls2 )])   -- Case 1
           | tp2 == 0 -> do                                                                       -- Case 1.1
               if Set.null hp1
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)                        -- Case 1.1.1
@@ -464,24 +506,32 @@ handleInsert nd1 nd2 = do
               
               --liftIO $ print $ " nd :" ++ show nd1 ++ " edges : " ++ show record1
               --liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
-                                   
+              liftIO $ print $ " nd :" ++ show nd2 ++ " HAPPENING HERE " ++ show record2                                   
 
-              if (lc1 <0) then 
-                update_ graph1Table (return (nd2, record2{tree_parent=nd1, nextSibling = -1{- , nextSibling=fc1 -}})) >>
-                update_ graph1Table (return (nd1, record1{firstChild = nd2, lastChild= nd2}))>>
-                updateLabel record1 nd2 record2 {nextSibling = (-1)} (-1)
+              if (lc1 <0) then do 
+                let pre2 = average pr1 ps1
+                let post2 = average pre2 ps1
+                update_ graph1Table (return (nd2, record2{preL = pre2, postL= post2, tree_parent=nd1, nextSibling = -1})) 
+                update_ graph1Table (return (nd1, record1{firstChild = nd2, lastChild= nd2}))
+
                 else 
-                  do update_ graph1Table (return (nd1, record1{lastChild= nd2}))
+                  do a  <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
+                     update_ graph1Table (return (nd1, record1{lastChild= nd2}))
                      record3 <- query firstRow (from graph1Table (at lc1))
                      update_ graph1Table (return (lc1, record3{nextSibling = nd2}))
-                     update_ graph1Table (return (nd2, record2{tree_parent = nd1, nextSibling = -1, lastSibling = lc1}))
-                     updateLabel record1 lc1 record3 nd2
+                     liftIO $ print $ " a :" ++ show a
+       
+                     let pre2 = average a ps1
+                     let post2= average pre2 ps1
+                     update_ graph1Table (return (nd2, record2{preL = pre2, postL= post2,tree_parent = nd1, nextSibling = -1, lastSibling = lc1}))
+              --       updateLabel record1 lc1 record3 nd2
               when(ls2>0) $
                 do 
                   record4 <- query firstRow (from graph1Table (at ls2))
                   update_ graph1Table (return (ls2, record4{nextSibling = ns2}))
                   --liftIO $ print $ " nd :" ++ show ls2 ++ " edges : " ++ show record4 
                   return()
+              when (fc2 >0) $ updateLabel {- nd2 record2 -} fc2
               {- TODO: - update the pre and post labels of nd2 and its children.
                           All the labels must be moved right after PreLabel nd1.
                        - update prevSibling for the firstChild of nd1
@@ -506,7 +556,7 @@ handleInsert nd1 nd2 = do
                  do
                    reLabelMain (PreLabel nd1)
                    a  <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
-                   ps1 <- getLabel (PostLabel nd1)
+--                   ps1 <- getLabel (PostLabel nd1)
 --                   liftIO $ print $ " FROM IF a : " ++ show a ++ " ps1 : " ++ show ps1
 
                    let pr = average a ps1
@@ -691,7 +741,6 @@ reLabelMain v  {- (PreLabel nd) -} =  do
 
 mainLoop :: Int64 -> Int64-> PrePostRef ->PrePostRef -> PrePostRef -> Daison (Nd, Int64, PrePostRef, PrePostRef, PrePostRef)
 mainLoop d count v begin end = do
-  --max <- getCounter
 --  liftIO $ print $ " mainloop v :" ++ show v ++ "  : " ++ show begin
   if (d <  max_bound) then 
     do 
@@ -805,6 +854,36 @@ nextOf (PostLabel nd) = do
     [(Labels trp pr ps hp dir fc lc ns ls)] -> if ns >0 then return (PreLabel ns)  
       else return (PostLabel trp)
 
+{- nextNode :: Nd -> Daison Nd
+nextNode nd = do
+  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
+  case record of 
+   [(Labels trp pr ps hp dir fc lc ns ls)] -> if fc >0 then return fc
+      else if ns > 0 then return ns
+      else nextPre trp
+
+nextPre :: Nd -> Daison Nd
+nextPre nd = if nd <= 0 then return 0
+             else 
+               do 
+ -}
+nextNode :: Nd -> Daison Nd
+nextNode nd = do 
+  a <- nextOf (PreLabel nd)
+  case a of 
+    (PreLabel n) -> return n 
+    (PostLabel n) -> nextPre (PostLabel n)
+
+
+nextPre :: PrePostRef -> Daison Nd
+nextPre (PreLabel n) = return n
+nextPre (PostLabel n) = if n <=0 then return 0
+  else do
+    b <- nextOf (PostLabel n)
+    liftIO $ print  $ " n  : " ++ show n ++ " b : " ++ show b
+    nextPre b
+
+    
 prevOf :: PrePostRef -> Daison PrePostRef
 prevOf (PreLabel nd) = do 
   record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
@@ -884,31 +963,6 @@ getParent node = do
     [(ind1,  label1)] -> case label1 of 
       (Labels trp _ _ _ _ _ _ _ _ ) -> return trp
     _           -> error "multiple parents error "
-
-getCounter :: Daison Nd
-getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
-
-
-getMax :: Daison Nd
-getMax = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
-
-
-updateMax :: Nd -> Daison()
-updateMax newmax =   update_ counters (return (1, ("l_max", newmax) )) 
-
-
-
-incrementCounter :: Daison ()
-incrementCounter = do
-  c_counter <- getCounter  
---  liftIO $ print $ " counter current value : " ++ show (c_counter+1) 
-  update_ counters (return (1, ("counter", c_counter+1) )) 
-  
-
-
-resetCounter :: Daison ()
-resetCounter = update_ counters (return (1, ("counter", 0) ))
-
 
 
 queryM :: Nd -> Nd -> Daison Bool
