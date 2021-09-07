@@ -20,6 +20,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Monadic
 import Data.Maybe (fromJust)
 import System.Process (callProcess, callCommand)
+import System.Directory
 import qualified Data.Bits as Bits
 import Data.Int
 
@@ -253,6 +254,7 @@ main = do
 
 main1 :: Int64 -> Double -> IO ()
 main1 n d = do
+  removeFile databaseTest
   IO.hSetBuffering IO.stdin IO.NoBuffering
   let Graph g1 = generateGraph n d
   print $ show g1 
@@ -263,7 +265,8 @@ main1 n d = do
     tryCreateTable nodeMapTable
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
-    let graphmap1 =  Map.fromList g
+    let graphmap1 | n == 0 = Map.fromList g
+                  | otherwise = Map.fromList g1
     dynamicProcess graphmap1 
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
@@ -321,46 +324,31 @@ makeDynamicOperation test_db readwritemode = do
     closeDB db
     makeDynamicOperation test_db readwritemode
 
-
 dynamicProcess :: GraphMap Node -> Daison ()
 dynamicProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
-  processNodes graphmap firstnode firstnode --(S "root")
-  processRemainingNodes graphmap
+  unprocessedGraph <-processNodes graphmap graphmap firstnode firstnode
+  foldM_ (\acc x -> processNodes acc acc x x ) unprocessedGraph (Map.keys unprocessedGraph)
+  return () 
 
---This process finds all the components that are not part of the main graph and process them 
--- there can be many disconnected components
-processRemainingNodes :: GraphMap Node -> Daison ()
-processRemainingNodes graphmap = do 
-  nodes <- select [nd | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
-  let graphlist = Map.toList graphmap
-  let nodelist = map (\(x,y) -> x ) graphlist
-  let difference = nodelist List.\\ nodes
-  liftIO $ print $ " nodes :  " ++ show nodes
-  liftIO $ print $ " difference : " ++ show difference
-  liftIO $ print $ " nodelist : " ++ show nodelist
-  when (length difference > 0 ) $ do 
-    processNodes graphmap (head difference)  (head difference) --(S "root")
-    processRemainingNodes graphmap
-  return()
-
-
-
-processNodes :: GraphMap Node -> Node -> Node -> Daison()
-processNodes graph node parent_node = do
+processNodes :: GraphMap Node -> GraphMap Node -> Node -> Node -> Daison(GraphMap Node)
+processNodes graph graphMap node parent_node = do
   nd <- getNdIndex node
   parent <- getNdIndex parent_node
-  par <-  query firstRow (from nodeMapTable (at parent)) 
+  par <-  query firstRow (from nodeMapTable (at parent))
   case par of
-    (X pnd edges) -> case (List.elem nd edges ) of
-      True -> return ()
-      False -> when (parent /= nd) $ handleInsert  parent nd   
-  let adjacent = Map.lookup node graph
-  case adjacent of
-      Nothing      -> return () 
-      Just []   -> return ()
-      Just rest    ->do
-        mapM_ (\x -> processNodes graph x node ) rest
+    (X pnd edges) ->
+      if List.elem nd edges
+         then return graphMap
+         else do
+            when (parent /= nd) $ handleInsert  parent nd
+            let adjacent = Map.lookup node graph
+                gm = Map.delete node graphMap
+            case adjacent of
+                Nothing      -> return gm
+                Just []   -> return gm
+                Just rest    ->do
+                  foldM (\acc x -> processNodes graph acc x node) gm rest
 
 handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
