@@ -24,6 +24,7 @@ import System.Directory
 import Data.Int
 import System.Random
 import Debug.Trace
+import Data.Time
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -178,9 +179,15 @@ main1 n d = do
   (x,y) <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable nodeMapTable
-
+    start <- liftIO $ do
+      start <- getCurrentTime
+      return start
     process graphmap1
-
+    end <- liftIO $ do
+      end <- getCurrentTime
+      return end
+    let timePassed = diffUTCTime end start  
+    liftIO $ print timePassed
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
     return (x,y)

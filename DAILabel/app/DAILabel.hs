@@ -23,6 +23,7 @@ import System.Process (callProcess, callCommand)
 import System.Directory
 import qualified Data.Bits as Bits
 import Data.Int
+import Data.Time
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -97,7 +98,16 @@ graph2 = Graph
       ( C 'j', [ C 'k' ] ),
       ( C 'k', [] )
     ]
-
+graph10 :: Graph Node 
+graph10 = Graph 
+  [
+    (I 1, [I 4]),
+    (I 2, []),
+    (I 3, []),    
+    (I 4, [I 5]),
+    (I 5, [I 6]),
+    (I 6, [I 7])
+  ]
 
 graph3 :: Graph Node 
 graph3 = Graph 
@@ -259,21 +269,30 @@ main1 n d = do
   let Graph g1 = generateGraph n d
   print $ show g1 
   db <- openDB databaseTest
-  (a,b)  <- runDaison db ReadWriteMode $ do
+  (a,b,c)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable counters
     tryCreateTable nodeMapTable
     insert counters (return ( "counter", 0 ))
-    let Graph g = graph2
+    let Graph g = graph10
     let graphmap1 | n == 0 = Map.fromList g
                   | otherwise = Map.fromList g1
-    dynamicProcess graphmap1 
+    start <- liftIO $ do
+      start <- getCurrentTime
+      return start
+    dynamicProcess graphmap1  
+    end <- liftIO $ do
+      end <- getCurrentTime
+      return end
+    let timePassed = diffUTCTime end start  
+
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
-    return (a,b)
+    return (a,b,timePassed)
   putStrLn "FROM dailabel"
   mapM_ (\y -> putStrLn (show y) ) a
   mapM_ (\y -> putStrLn (show y) ) b
+  print $ "Time for  DaiLabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
@@ -341,14 +360,25 @@ processNodes graph graphMap node parent_node = do
       if List.elem nd edges
          then return graphMap
          else do
-            when (parent /= nd) $ handleInsert  parent nd
+{-             when (parent /= nd) $ handleInsert  parent nd -}
             let adjacent = Map.lookup node graph
                 gm = Map.delete node graphMap
+            if (parent /= nd) 
+              then handleInsert  parent nd
+              else do 
+                when (adjacent == Just []) $ 
+                  do
+                    (pre, post) <- insertIsolatedNode
+                    store graph1Table (Just nd) (Labels 0   pre post Set.empty Set.empty )
+                    return()
             case adjacent of
                 Nothing      -> return gm
                 Just []   -> return gm
                 Just rest    ->do
                   foldM (\acc x -> processNodes graph acc x node) gm rest
+  where
+    insertIsolatedNode = getCounter >>= \x ->incrementCounter >>incrementCounter >> return (x*gap ,(x+1) *gap)
+
 
 handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do

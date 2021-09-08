@@ -22,6 +22,7 @@ import System.Process (callProcess, callCommand)
 import System.Directory
 import qualified Data.Bits as Bits
 import Data.Int
+import Data.Time
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -212,7 +213,16 @@ graph6 = Graph
       ( C 'e', [] ),
       ( C 'f', [] )
     ]
-
+graph10 :: Graph Node 
+graph10 = Graph 
+  [
+    (I 1, [I 4]),
+    (I 2, [I 3]),
+    (I 3, []),    
+    (I 4, [I 5]),
+    (I 5, [I 6]),
+    (I 6, [I 7])
+  ]
 
 instance Show Labels where
   show (Labels a b c d e f g h i) = "TP: " ++  show a ++   " Pre: " ++ show b ++
@@ -306,19 +316,29 @@ main1 n d= do
   let Graph g1 = generateGraph n d
   print $ show g1
   db <- openDB databaseTest
-  (a,b)  <- runDaison db ReadWriteMode $ do
+  (a,b,c)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable nodeMapTable
-    let Graph g = graph6
+    let Graph g = graph10
     let graphmap1 | n == 0 = Map.fromList g
                   | otherwise = Map.fromList g1
+{-     liftIO $ print $ " before dynamic process" -}
+    start <- liftIO $ do
+      start <- getCurrentTime
+      return start
     dynamicProcess graphmap1 
+    end <- liftIO $ do
+      end <- getCurrentTime
+      return end
+    let timePassed = diffUTCTime end start  
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
-    return (a,b)
+    return (a,b,timePassed)
   putStrLn "FROM dailabel modified"
   mapM_ (\y -> putStrLn (show y) ) a
   mapM_ (\y -> putStrLn (show y) ) b
+  print $ "Time for  DaiLabel modified for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
+
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
@@ -376,14 +396,47 @@ makeDynamicOperation test_db readwritemode = do
     closeDB db
     makeDynamicOperation test_db readwritemode
 
+{- dynamicProcess :: GraphMap Node -> Daison ()
+dynamicProcess graphmap = do
+{-   liftIO $ print $ " inside dynamic process" -}
+
+  let firstnode = fst $ Map.elemAt 0 graphmap
+{-   liftIO $ print $ " inside dynamic process 2" -}
+  store nodeMapTable (Just 0) (X (S "root" ) [])
+  store graph1Table (Just 0) (Labels (-1) 0 max_bound Set.empty Set.empty (-100) (-100) (-100) (-100) )    
+  processNodes graphmap firstnode (S "root")
+  processRemainingNodes graphmap
+ -}
+
 dynamicProcess :: GraphMap Node -> Daison ()
 dynamicProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
   store nodeMapTable (Just 0) (X (S "root" ) [])
   store graph1Table (Just 0) (Labels (-1) 0 max_bound Set.empty Set.empty (-100) (-100) (-100) (-100) )    
-  processNodes graphmap firstnode (S "root")
-  processRemainingNodes graphmap
+  --processNodes graphmap firstnode (S "root")
+  unprocessedGraph <-processNodes graphmap graphmap firstnode (S "root")
+  foldM_ (\acc x -> processNodes acc acc x (S "root") ) unprocessedGraph (Map.keys unprocessedGraph)
+  return () 
+--  processRemainingNodes graphmap
 
+
+{- processRemainingNodes :: GraphMap Node -> Daison ()
+processRemainingNodes graphmap = do 
+  nodes <- select [nd | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
+  let graphlist = Map.toList graphmap
+  let nodelist = map (\(x,y) -> x ) graphlist
+  let difference = nodelist List.\\ nodes
+  liftIO $ print $ " nodes :  " ++ show nodes
+  liftIO $ print $ " difference : " ++ show difference
+  liftIO $ print $ " nodelist : " ++ show nodelist
+  when (length difference > 0 ) $ do 
+    processNodes graphmap (head difference) (S "root")
+    processRemainingNodes graphmap
+  return()
+ -}
+
+
+{- 
 processRemainingNodes :: GraphMap Node -> Daison ()
 processRemainingNodes graphmap = do 
   nodes <- select [nd | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
@@ -399,22 +452,44 @@ processRemainingNodes graphmap = do
   return()
 
 
-
 processNodes :: GraphMap Node -> Node -> Node -> Daison()
 processNodes graph node parent_node = do
+{-   liftIO $ print $ " 3" -}
   nd <- getNdIndex node
   parent <- getNdIndex parent_node
   par <-  query firstRow (from nodeMapTable (at parent))
   case par of
-    (X pnd edges) -> case (List.elem nd edges ) of
-      True -> return ()
-      False -> handleInsert  parent nd   
-  let adjacent = Map.lookup node graph
-  case adjacent of
-      Nothing      -> return () 
-      Just []   -> return ()
-      Just rest    ->do
-        mapM_ (\x -> processNodes graph x node ) rest
+    (X pnd edges) ->
+      if List.elem nd edges
+         then return ()
+         else do
+            when (parent /= nd) $ handleInsert  parent nd
+            let adjacent = Map.lookup node graph
+            case adjacent of
+                Nothing      -> return ()
+                Just []   -> return ()
+                Just rest    ->do                          
+                  mapM_ (\x -> processNodes graph x node ) rest -}
+
+processNodes :: GraphMap Node -> GraphMap Node -> Node -> Node -> Daison(GraphMap Node)
+processNodes graph graphMap node parent_node = do
+{-   liftIO $ print $ " nd :" ++ show node ++ " edges : " ++ show parent_node -}
+  nd <- getNdIndex node
+  parent <- getNdIndex parent_node
+  par <-  query firstRow (from nodeMapTable (at parent))
+  case par of
+    (X pnd edges) ->
+      if List.elem nd edges
+         then return graphMap
+         else do
+            when (parent /= nd) $ handleInsert  parent nd
+            let adjacent = Map.lookup node graph
+                gm = Map.delete node graphMap
+            case adjacent of
+                Nothing      -> return gm
+                Just []   -> return gm
+                Just rest    ->do
+                  foldM (\acc x -> processNodes graph acc x node) gm rest
 
 {- updateLabel :: Labels ->Nd ->Labels -> Nd -> Daison()
 updateLabel record@(Labels ptrp ppr pps _ _ pfc flc pns pls ) nd1 record1@(Labels _ pr1 ps1 _ _ fc1  rlc1 ns1 _) nd2 
@@ -495,7 +570,8 @@ handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
   res2 <- select (from graph1Table (at nd2))
-  
+{-   liftIO $ print $ " nd1 :" ++ show nd1 ++ " res : " ++ show res1
+  liftIO $ print $ " nd2 : " ++ show nd2 ++ " res : " ++ show res2  -}
   case (res1,res2) of
 
     ([record1@(Labels tp1 pr1 ps1 hp1 _ fc1 lc1 _ _ )],[record2@(Labels tp2 pr2 ps2 hp2 dir2 fc2 _ ns2 ls2 )])   -- Case 1
@@ -536,10 +612,12 @@ handleInsert nd1 nd2 = do
                           All the labels must be moved right after PreLabel nd1.
                        - update prevSibling for the firstChild of nd1
                        - update firstChild for nd1 -}
-          | otherwise -> do                                                                      -- Case 1.2
-              if not (Set.null hp1)
+          | otherwise -> do  
+ -- Case 1.2
+              if (not (Set.null hp1) || tp1 <= 0 || tp1 == nd1)
                 then addHop nd1 record1 nd2                                                      -- Case 1.2.1
-                else do record <- query firstRow (from graph1Table (at tp1))                     -- Case 1.2.2
+                else do 
+                        record <- query firstRow (from graph1Table (at tp1))                     -- Case 1.2.2  
                         updateDirectInAncestors tp1 record (Set.insert nd1)
                         addHop nd1 record1 nd2
 --              liftIO $ print $ " nd1 :" ++ show nd1 ++ " " ++ show record1
@@ -707,7 +785,7 @@ handleDelete nd1 nd2 = do
       return ()
 
 addHop :: Nd -> Labels -> Nd -> Daison ()
-addHop nd1 (Labels tp pr ps hp dir fc lc ns ls) nd2 = do
+addHop nd1 (Labels tp pr ps hp dir fc lc ns ls) nd2 = when (nd1 > 0) $ do
   store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir fc lc ns ls)
   return ()
 
