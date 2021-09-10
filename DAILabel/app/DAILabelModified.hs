@@ -322,14 +322,9 @@ main1 n d= do
     let Graph g = graph10
     let graphmap1 | n == 0 = Map.fromList g
                   | otherwise = Map.fromList g1
-{-     liftIO $ print $ " before dynamic process" -}
-    start <- liftIO $ do
-      start <- getCurrentTime
-      return start
+    start <- liftIO $ getCurrentTime 
     dynamicProcess graphmap1 
-    end <- liftIO $ do
-      end <- getCurrentTime
-      return end
+    end <- liftIO $ getCurrentTime
     let timePassed = diffUTCTime end start  
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
@@ -579,35 +574,14 @@ handleInsert nd1 nd2 = do
               if Set.null hp1
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)                        -- Case 1.1.1
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)                        -- Case 1.1.2
-              
-              --liftIO $ print $ " nd :" ++ show nd1 ++ " edges : " ++ show record1
-              --liftIO $ print $ " nd :" ++ show nd2 ++ " edges : " ++ show record2
-              liftIO $ print $ " nd :" ++ show nd2 ++ " HAPPENING HERE " ++ show record2                                   
-
-              if (lc1 <0) then do 
-                let pre2 = average pr1 ps1
-                let post2 = average pre2 ps1
-                update_ graph1Table (return (nd2, record2{preL = pre2, postL= post2, tree_parent=nd1, nextSibling = -1})) 
-                update_ graph1Table (return (nd1, record1{firstChild = nd2, lastChild= nd2}))
-
-                else 
-                  do a  <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
-                     update_ graph1Table (return (nd1, record1{lastChild= nd2}))
-                     record3 <- query firstRow (from graph1Table (at lc1))
-                     update_ graph1Table (return (lc1, record3{nextSibling = nd2}))
-                     liftIO $ print $ " a :" ++ show a
-       
-                     let pre2 = average a ps1
-                     let post2= average pre2 ps1
-                     update_ graph1Table (return (nd2, record2{preL = pre2, postL= post2,tree_parent = nd1, nextSibling = -1, lastSibling = lc1}))
-              --       updateLabel record1 lc1 record3 nd2
-              when(ls2>0) $
-                do 
+              (updatedRecord1 , updatedRecord2) <- verifyAndInsertChild nd1 record1 nd2 record2
+              update_ graph1Table (return (nd1, updatedRecord1))
+              update_ graph1Table (return (nd2, updatedRecord2))
+              when(ls2>0) $ do 
                   record4 <- query firstRow (from graph1Table (at ls2))
                   update_ graph1Table (return (ls2, record4{nextSibling = ns2}))
-                  --liftIO $ print $ " nd :" ++ show ls2 ++ " edges : " ++ show record4 
                   return()
-              when (fc2 >0) $ updateLabel {- nd2 record2 -} fc2
+              when (fc2 >0) $ updateLabel fc2
               {- TODO: - update the pre and post labels of nd2 and its children.
                           All the labels must be moved right after PreLabel nd1.
                        - update prevSibling for the firstChild of nd1
@@ -619,89 +593,63 @@ handleInsert nd1 nd2 = do
                 else do 
                         record <- query firstRow (from graph1Table (at tp1))                     -- Case 1.2.2  
                         updateDirectInAncestors tp1 record (Set.insert nd1)
-                        addHop nd1 record1 nd2
---              liftIO $ print $ " nd1 :" ++ show nd1 ++ " " ++ show record1
---              liftIO $ print $ " nd2 :" ++ show nd2 ++ " " ++ show record2 
+                        addHop nd1 record1 nd2 
               return ()
 
     ([record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _ )],[]                                          ) ->  -- Case 2
-          do --when ((ps1 - pr1) <=2 ) $ reLabelMain (PreLabel nd1)
---             liftIO $ print $ " nd1 : " ++ show nd1 ++ " nd2 : " ++ show nd2++ " pr :" ++ show pr1 ++ " ps : " ++ show ps1 
-
-             (pre,post,ns2,ls2)  <- if ((ps1 - pr1) <=2 ) 
-
-               then
-                 do
-                   reLabelMain (PreLabel nd1)
-                   a  <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
---                   ps1 <- getLabel (PostLabel nd1)
---                   liftIO $ print $ " FROM IF a : " ++ show a ++ " ps1 : " ++ show ps1
-
-                   let pr = average a ps1
-                   let ps = average pr ps1
-                   (new_fc1, new_lc1, ns2, ls2) <- if lc1 < 0 
-                     then return (nd2,nd2,(-1),(-1)) 
-                     else do res3 <- query firstRow (from graph1Table (at lc1))
-                             case res3 of 
-                              record3@(Labels _ _ _ _ _ _  _ ns _) -> store graph1Table (Just lc1) record3{nextSibling = nd2}
-                             return (fc1, nd2,(-1), lc1 )
-                   newRes1 <- query firstRow (from graph1Table (at nd1))
-                   case newRes1 of 
-                    newRecord1@(Labels _ _ _ _ _ _  _ _ _) ->store graph1Table (Just nd1) newRecord1{firstChild = new_fc1,lastChild = new_lc1}
-                   return (pr,ps,ns2,ls2)
-
-               else do 
-                 a <- prevOf (PostLabel nd1) >>= \x -> getLabel x 
-                 let pr = average a ps1
-                 let ps = average pr ps1
---                 liftIO $ print $ " FROM ELSE a : " ++ show a ++ " ps1 : " ++ show ps1
-                 (new_fc1, new_lc1, ns2, ls2) <- if lc1 < 0 
-                   then return (nd2,nd2,(-1),(-1)) 
-                   else do res3 <- query firstRow (from graph1Table (at lc1))
-                           case res3 of 
-                            record3@(Labels _ _ _ _ _ _  _ ns _) -> store graph1Table (Just lc1) record3{nextSibling = nd2}
-                           return (fc1, nd2,(-1), lc1 )
-            
-                 store graph1Table (Just nd1) record1{firstChild = new_fc1,lastChild = new_lc1}
-
-                 return (pr,ps,ns2,ls2)
-
-
-             store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty (-1) (-1) ns2 {- fc1 -} ls2)
+          do (updatedRecord1, updatedRecord2) <- verifyAndInsertChild nd1 record1 nd2 (Labels nd1 0 0 Set.empty Set.empty (-1) (-1) (-1) (-1)  )
+             store graph1Table (Just nd1) updatedRecord1
+             store graph1Table (Just nd2) updatedRecord2
              {- TODO: - update prevSibling for the firstChild of nd1 ??
                       - update firstChild for nd1 -}
 
              return ()
 
-    ([]                                       ,[record2@(Labels tp2 _ _ hp2 dir2 _ _ ns2 ps2 )])     -- Case 3
+    ([]                                       ,[record2@(Labels tp2 pre2 pos2 hp2 dir2 _ _ ns2 ps2 )])     -- Case 3
           | tp2 > 0   -> do                                                                      -- Case 3.1
-              (pre,post,prevSib)  <- insertIsolatedNode nd1 {- TODO: insert two labels after (PreLabel root), root == 0 -}
-              store graph1Table (Just nd1) (Labels 0 pre post (Set.singleton nd2) Set.empty (-1) (-1) (-1) prevSib)
+      {- TODO: insert two labels after (PreLabel root), root == 0 -}
+              rootRecord <- query firstRow (from graph1Table (at 0))  
+              (urootRecord, uRecord1) <- verifyAndInsertChild 0 rootRecord nd1 (Labels 0 0 0 Set.empty Set.empty (-1) (-1) (-1) (-1))
+              store graph1Table (Just 0) urootRecord
+              store graph1Table (Just nd1) uRecord1{ hops= (Set.singleton nd2)}--(Labels 0 pre post (Set.singleton nd2) Set.empty (-1) (-1) (-1) prevSib)
               return ()
           | otherwise -> do                                                                      -- Case 3.2
               (pre,post)  <- do
+                liftIO $ print $ " this is node 1 : " ++ show nd1 ++ " possible for  : " ++ show nd2
                 a <- prevOf (PreLabel nd2) >>= \x -> getLabel x 
                 b <-nextOf (PostLabel nd2) >>= \x -> getLabel x
-                prend2 <- getLabel (PreLabel nd2)
-                posnd2 <- getLabel (PostLabel nd2)
-                let pre = average prend2 a 
-                let post = average posnd2 b --update siblings and children of root
-                return (pre,post) {- TODO: insert one label after (prevOf (PreLabel nd2)) -}
-              {-post <- undefined  TODO: insert one label after (PostLabel nd2) -}
-              when (ns2 >0 ) $ --updating siblings 
-                do 
+                if (pre2-a) <= 2  || (b -pos2) <=2  then do 
+                  when (pre2-a <= 2 ) $ do  
+                    prevOf (PreLabel nd2) >>= \x -> reLabelMain x
+                  when (b-pos2 <= 2) $ do 
+                    reLabelMain (PostLabel nd2)
+                  --need to recalculate the prev and next values because the labels might have updated.  
+                  na <- prevOf (PreLabel nd2) >>= \x -> getLabel x 
+                  nb <-nextOf (PostLabel nd2) >>= \x -> getLabel x
+                  newRes2 <- query firstRow (from graph1Table (at nd2)) --need to refetch the record as the labels are updated now
+                  case newRes2 of 
+                      newRecord2@(Labels _ nprend2 nposnd2 _ _ _  _ _ _) -> do 
+                        store graph1Table (Just nd2) newRecord2{tree_parent=nd1, nextSibling= (-1), lastSibling = (-1)}
+                        let npre = average nprend2 na 
+                            npost = average nposnd2 nb 
+                        return(npre,npost)
+                  else do 
+                    let pre = average pre2 a 
+                    let post = average pos2 b 
+                    store graph1Table (Just nd2) record2{tree_parent=nd1, nextSibling= (-1), lastSibling = (-1)}
+                    return (pre,post)
+                --update siblings and children of root
+              when (ns2 >0 ) $ do --updating siblings 
                   res3 <- query firstRow (from graph1Table (at ns2))
                   case res3 of 
                     record3@(Labels _ _ _ _ _ _  _ _ ps) -> store graph1Table (Just ns2) record3{lastSibling = nd1}
                   return ()
-              when (ps2 >0 ) $
-                do 
+              when (ps2 >0 ) $ do
                   res4 <- query firstRow (from graph1Table (at ps2))
                   case res4 of 
                     record4@(Labels _ _ _ _ _ _  _ ns _) -> store graph1Table (Just ps2) record4{nextSibling = nd1}
                   return ()              
               let record1 = Labels 0 pre post Set.empty Set.empty nd2 nd2 ns2 ps2
-              store graph1Table (Just nd2) record2{tree_parent=nd1, nextSibling= (-1), lastSibling = (-1)}
               if Set.null hp2
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)
@@ -718,24 +666,41 @@ handleInsert nd1 nd2 = do
 --  store nodeMapTable (Just parent) (X pnd (List.nub (nd:edges)))
   where 
     average x y = x + div (y-x) 2
-    insertIsolatedNode nd1 = do 
-      res <- query firstRow (from graph1Table (at 0))
-      case res of 
-        record@(Labels _ _ _ _ _ _  rlc _ _) -> if rlc < 0 then 
-          do 
-            let pre1 = average 0 max_bound
-            let post1 = average pre1 max_bound
-            store graph1Table (Just 0) record{firstChild = nd1, lastChild =nd1}
-            return (pre1,post1, (-1))
-          else do
-            res1 <- query firstRow (from graph1Table (at rlc))
-            case res1 of 
-              record1@(Labels _ pr1 ps1 _ _ _ _ _ _)   -> do 
-                let pre1 = average ps1 max_bound 
-                let post1 = average pre1 max_bound
-                store graph1Table (Just rlc) record1{ nextSibling = nd1} 
-                store graph1Table (Just 0) record{ lastChild =nd1} 
-                return (pre1,post1, rlc)
+    verifyAndInsertChild nd1 record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _) nd2 record2@(Labels tp2 _ _ _ _ _ _ _ _ ) = do 
+      if(lc1 < 0) then do 
+        if (ps1-pr1 <=2) then do 
+          reLabelMain (PreLabel nd1)
+          updatedRes1 <- query firstRow (from graph1Table (at nd1))
+          case updatedRes1 of
+            updatedRecord1@(Labels _ upr ups _ _ _ _ _ _ ) -> do
+              let pre = average upr ups
+                  post=  average pre ups
+              return (updatedRecord1{firstChild = nd2, lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post}  )
+          else do 
+            let pre = average pr1 ps1 
+                post = average pre ps1
+            return (record1{firstChild = nd2, lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post}  )  
+        else do 
+          lc1Record <- query firstRow (from graph1Table (at lc1))
+          case lc1Record of
+            (Labels _ _ lps _ _ _ _ _ _) -> do 
+              if(ps1-lps <=2) then do
+                reLabelMain (PostLabel lc1)
+                updatedRes1 <- query firstRow (from graph1Table (at nd1))
+                case updatedRes1 of
+                  updatedRecord1@(Labels _ upr ups _ _ _ _ _ _ ) -> do
+                    ulc1Record <- query firstRow (from graph1Table (at lc1))
+                    case ulc1Record of
+                      (Labels _ _ ulps _ _ _ _ _ _ ) -> do
+                        let pre = average ulps ups
+                            post=  average pre ups
+                        update_ graph1Table (return (lc1, ulc1Record{nextSibling = nd2}))
+                        return (updatedRecord1{ lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post,lastSibling = lc1 }  )
+              else do
+                let pre = average lps ps1
+                    post= average pre ps1
+                update_ graph1Table (return (lc1, lc1Record{nextSibling = nd2}))
+                return (record1{ lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post,lastSibling = lc1 }  )
     insert2IsolatedNodes nd1 nd2 = do 
       res <- query firstRow (from graph1Table (at 0))
       case res of 
@@ -751,11 +716,23 @@ handleInsert nd1 nd2 = do
             res1 <- query firstRow (from graph1Table (at rlc))
             case res1 of 
               record1@(Labels  _ pr1 ps1 _ _ _ _ _ _ )-> do 
-                let pre1 = average ps1 max_bound 
-                let post1 = average pre1 max_bound
+                (pre1,post1) <- if ((max_bound - ps1) < 12 )
+                  then do
+                    reLabelMain (PostLabel rlc)
+                    updatedRes <- query firstRow (from graph1Table (at rlc))
+                    case updatedRes of
+                      updatedRecord@(Labels _ upr ups _ _ _ _ _ _ ) -> do
+                        let pre1 = average ups max_bound
+                        let post1=  average pre1 max_bound
+                        store graph1Table (Just rlc) updatedRecord{ nextSibling = nd1} --to update the rlc record with updated pre and post values
+                        return (pre1,post1)
+                  else do 
+                    let pre1 = average ps1 max_bound 
+                    let post1 = average pre1 max_bound
+                    store graph1Table (Just rlc) record1{ nextSibling = nd1} 
+                    return (pre1, post1)
                 let pre2 = average pre1 post1 
                 let post2 = average pre2 post1 
-                store graph1Table (Just rlc) record1{ nextSibling = nd1} 
                 store graph1Table (Just 0) record{ lastChild =nd1}
                 return (pre1,pre2,post1,post2,rlc )
 

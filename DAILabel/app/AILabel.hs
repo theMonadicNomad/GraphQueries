@@ -176,25 +176,22 @@ main1 n d = do
   removeFile databaseTest
 
   db <- openDB databaseTest
-  (x,y) <- runDaison db ReadWriteMode $ do
+  (x,y,z) <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable nodeMapTable
-    start <- liftIO $ do
-      start <- getCurrentTime
-      return start
+    start <- liftIO $ getCurrentTime
     process graphmap1
-    end <- liftIO $ do
-      end <- getCurrentTime
-      return end
+    end <- liftIO $ getCurrentTime
     let timePassed = diffUTCTime end start  
     liftIO $ print timePassed
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
-    return (x,y)
+    return (x,y,timePassed)
 
   putStrLn "-------------------"
   mapM_ print x
   mapM_ print y
+  print $ "Time for AILabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show z
 
   closeDB db
 

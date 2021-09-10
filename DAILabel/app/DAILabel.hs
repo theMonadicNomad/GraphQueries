@@ -86,7 +86,7 @@ graph11 = Graph
 
 graph2 :: Graph Node
 graph2 = Graph
-    [ ( C 'a',  [ C 'b', C 'c']  ),
+    [ ( C 'a',  [ C 'b',  C 'c' ]  ),
       ( C 'b', [  C 'd', C 'e', C 'f' ] ),
       ( C 'c', [ C 'h' ] ),
       ( C 'd', [ C 'k' ] ),
@@ -240,8 +240,8 @@ main = do
   putStrLn (" Enter the density : ")
   inp_2 <- getLine
   let n = (read inp_1 :: Int64)
-  let d = (read inp_2 :: Double)
-  let Graph g1 = generateGraph n d
+      d = (read inp_2 :: Double)
+      Graph g1 = generateGraph n d
   print $ show g1 
   db <- openDB databaseTest
   (a,b)  <- runDaison db ReadWriteMode $ do
@@ -250,7 +250,7 @@ main = do
     tryCreateTable nodeMapTable
     insert counters (return ( "counter", 0 ))
     let Graph g = graph2
-    let graphmap1 =  Map.fromList g
+        graphmap1 =  Map.fromList g
     dynamicProcess graphmap1 
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
@@ -274,16 +274,12 @@ main1 n d = do
     tryCreateTable counters
     tryCreateTable nodeMapTable
     insert counters (return ( "counter", 0 ))
-    let Graph g = graph10
-    let graphmap1 | n == 0 = Map.fromList g
+    let Graph g = graph2
+        graphmap1 | n == 0 = Map.fromList g
                   | otherwise = Map.fromList g1
-    start <- liftIO $ do
-      start <- getCurrentTime
-      return start
+    start <- liftIO $  getCurrentTime
     dynamicProcess graphmap1  
-    end <- liftIO $ do
-      end <- getCurrentTime
-      return end
+    end <- liftIO $  getCurrentTime
     let timePassed = diffUTCTime end start  
 
     a <- select [ x | x <- from graph1Table everything ]
@@ -360,20 +356,17 @@ processNodes graph graphMap node parent_node = do
       if List.elem nd edges
          then return graphMap
          else do
-{-             when (parent /= nd) $ handleInsert  parent nd -}
+            when (parent /= nd) $ handleInsert  parent nd 
             let adjacent = Map.lookup node graph
                 gm = Map.delete node graphMap
-            if (parent /= nd) 
-              then handleInsert  parent nd
-              else do 
-                when (adjacent == Just []) $ 
-                  do
-                    (pre, post) <- insertIsolatedNode
-                    store graph1Table (Just nd) (Labels 0   pre post Set.empty Set.empty )
-                    return()
             case adjacent of
                 Nothing      -> return gm
-                Just []   -> return gm
+                Just []   -> do 
+                  when (parent == nd ) $ do
+                    (pre, post) <- insertIsolatedNode
+                    store graph1Table (Just nd) (Labels 0   pre post Set.empty Set.empty )
+                    return ()
+                  return gm
                 Just rest    ->do
                   foldM (\acc x -> processNodes graph acc x node) gm rest
   where
