@@ -632,8 +632,6 @@ reLabelAll  all visited t = do
   return()
 
 
-
-
 relabel :: Nd -> [Nd] -> Char-> Daison [Nd]
 relabel nd visited t =  do 
   x <- updatePre nd visited
@@ -652,13 +650,13 @@ updatePre :: Nd -> [Nd] -> Daison Bool
 updatePre nd visited = do 
   record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
   case record of 
-    [(nd, Labels trp pr ps hp dir)] -> if pr == ps || elem nd visited then return True
-                                           else   
-                                             do
-                                               c_counter <- getCounter
-                                               incrementCounter
-                                               update_ graph1Table (return (nd, Labels trp (c_counter*gap) (c_counter*gap) hp dir  ))
-                                               return False
+    [(nd, Labels trp pr ps hp dir)] -> 
+      if pr == ps || elem nd visited then return True
+        else do
+          c_counter <- getCounter
+          incrementCounter
+          update_ graph1Table (return (nd, Labels trp (c_counter*gap) (c_counter*gap) hp dir  ))
+          return False
     _ -> error "error " 
 
 updatePost :: Nd -> Daison ()
