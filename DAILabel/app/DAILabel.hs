@@ -96,7 +96,8 @@ graph2 = Graph
       ( C 'h', [ C 'k' ] ),
       ( C 'i', [ C 'k' ] ),
       ( C 'j', [ C 'k' ] ),
-      ( C 'k', [] )
+      ( C 'k', [] ),
+      (C 'm', [ C 'a' ])
     ]
 graph10 :: Graph Node 
 graph10 = Graph 
@@ -412,18 +413,22 @@ handleInsert nd1 nd2 = do
 
     ([]                                       ,[record2@(Labels tp2 _ _ hp2 dir2 )])     -- Case 3
           | tp2 > 0   -> do              
-              (pre,post)  <- insertIsolatedNode {- TODO: insert two labels after (PreLabel root), root == 0 -}
+              (pre,post)  <- insertIsolatedNode 
               store graph1Table (Just nd1) (Labels 0 pre post (Set.singleton nd2) Set.empty)
               return ()
           | otherwise -> do  
-              (pre,post)  <- insertIsolatedNode
-              
+
+              (pre,post)  <- insertIsolatedNode              
               let record1 = Labels 0 pre post Set.empty Set.empty 
               store graph1Table (Just nd2) record2{tree_parent=nd1}
+--              x <- getCounter
               if Set.null hp2
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)
-
+              resetCounter
+              --reLabelAll (allnodes) [] 'n'
+              relabel nd1 [] 'n'
+              return ()
     ([]                                       ,[]                                          ) ->  -- Case 4
           do 
              (pre1,pre2,post1,post2) <- insert2IsolatedNodes {- TODO: insert four labels after (PreLabel root) -}

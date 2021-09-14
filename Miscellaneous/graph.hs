@@ -80,10 +80,6 @@ generateGraph1 n p = do
           return (ugen, I <$> catMaybes vs')
 --          map I $ sort $ nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
-
-
-
-
 ranValues gen n a b = do
   let values = take n (randomRs (a,b) gen )
   putStrLn $ show (values)

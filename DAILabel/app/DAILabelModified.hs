@@ -315,7 +315,7 @@ main1 n d= do
   (a,b,c)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
     tryCreateTable nodeMapTable
-    let Graph g = graph6
+    let Graph g = graph2
     let graphmap1 | n == 0 = Map.fromList g
                   | otherwise = Map.fromList g1
     start <- liftIO $ getCurrentTime 
