@@ -23,6 +23,7 @@ import System.Directory
 import qualified Data.Bits as Bits
 import Data.Int
 import Data.Time
+import Data.Maybe
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -277,6 +278,33 @@ isAlphabet ch = if ch `elem` ['a'..'z'] || ch `elem` ['A'..'Z']
 		then True 
 		else False
 
+generateGraph1 :: Int64 -> Double -> IO (Graph Node)
+generateGraph1 n p = do
+  gen <- getStdGen
+  (_, g) <- foldM (\(genV, vs) x -> do
+    (gup, vsup) <- restList genV x
+    return (gup, vs ++ [(I x, vsup)])) (gen, []) {- list@( -}[1..n]
+  return $ Graph g
+    where
+        restList genV x = do
+          (vs, ugen) <- ranValues genV (fromEnum $ (n-x)) 0.0 1.0
+          let vs' =
+                zipWith (\v i -> if v <= p
+                              then Just i
+                              else Nothing
+                  )
+                  vs
+                  [(x+1)..(n)]
+          return (ugen, I <$> catMaybes vs')
+--          map I $ sort $ nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
+
+ranValues gen n a b = do
+  let values = take n (randomRs (a,b) gen )
+  putStrLn $ show (values)
+  let (_,newGen) = random gen :: (Double, StdGen)
+  return (values, newGen)
+
+
 
 main :: IO ()
 main = do
@@ -309,7 +337,7 @@ main1  :: Int64 -> Double -> IO ()
 main1 n d= do
   removeFile databaseTest
   IO.hSetBuffering IO.stdin IO.NoBuffering
-  let Graph g1 = generateGraph n d
+  Graph g1 <- generateGraph1 n d
   print $ show g1
   db <- openDB databaseTest
   (a,b,c)  <- runDaison db ReadWriteMode $ do

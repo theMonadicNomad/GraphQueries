@@ -64,8 +64,10 @@ generateGraph1 :: Int64 -> Double -> IO (Graph Node)
 generateGraph1 n p = do
   gen <- getStdGen
   (_, g) <- foldM (\(genV, vs) x -> do
-    (gup, vsup) <- restList genV x
-    return (gup, vs ++ [(I x, vsup)])) (gen, []) {- list@( -}[1..n]
+        (gup, vsup) <- restList genV x
+        return (gup, vs ++ [(I x, vsup)])) 
+    (gen, []) 
+    [1..n]
   return $ Graph g
     where
         restList genV x = do
@@ -78,10 +80,21 @@ generateGraph1 n p = do
                   vs
                   [(x+1)..(n)]
           return (ugen, I <$> catMaybes vs')
---          map I $ sort $ nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
 ranValues gen n a b = do
   let values = take n (randomRs (a,b) gen )
   putStrLn $ show (values)
   let (_,newGen) = random gen :: (Double, StdGen)
   return (values, newGen)
+
+
+
+
+  --ranValues :: StdGen -> Int -> IO ()
+ranValues1 ::  Int -> Double -> Double -> IO ()
+ranValues1 n a b = do 
+  gen <- getStdGen
+  let values = take n (randomRs (a,b) gen )
+  putStrLn $ show (values)
+  let (_,newGen) = random gen :: (Double, StdGen)
+  putStrLn $ show (newGen ) 
