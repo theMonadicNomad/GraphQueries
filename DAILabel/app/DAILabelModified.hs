@@ -637,27 +637,75 @@ handleInsert nd1 nd2 = do
 
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
-  istreeEdge <- isTreeEdge nd1 nd2
-  deleteEdge nd1 nd2
-  case istreeEdge of
-    True -> do
-      deleteDirectsandAncestors nd1 nd2
-      removeTreeParent nd2
+  res1 <- select (from graph1Table (at nd1))
+  res2 <- select (from graph1Table (at nd2))
+  if( null res1|| null res2 ) then 
+    liftIO $ print $ " node doesn't exist, try again "
+    else do 
+      istreeEdge <- isTreeEdge nd1 (head res1) nd2
+      deleteEdge nd1 nd2
+      case istreeEdge of
+        True -> do
+          deleteDirectsandAncestors nd1 (head res1) nd2
+          removeTreeParent nd2
 --      relabel nd2 
-    False -> do
-      flag <- isTheOnlyNonTreeEdge nd1 nd2
-      when flag $
-        do
-          record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
-          case record of
-            [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
-              deleteDirectsandAncestors tp nd1
-              when ( not $ Set.null dir ) $ do
+        False -> do
+          flag <- isTheOnlyNonTreeEdge nd1 (head res1) nd2
+          when flag $ do
+            case res1 of
+              [(Labels tp pr ps hp dir fc lc ns ls)] -> do
                 record <- query firstRow (from graph1Table (at tp))
-                updateDirectInAncestors tp record (Set.union dir)
-            _ -> error $ "invalid from handle delete : " ++ show nd1 ++ show nd2
-      deleteHopsFrom nd1 nd2
-      return ()
+                deleteDirectsandAncestors tp record nd1
+                when ( not $ Set.null dir ) $ do
+                  updateDirectInAncestors tp record (Set.union dir)
+              _ -> error $ "invalid from handle delete : " ++ show nd1 ++ show nd2
+          deleteHopsFrom nd1 (head res1) nd2 --verify 
+          return ()
+
+isTreeEdge :: Nd -> Labels-> Nd -> Daison Bool
+isTreeEdge nd1 record nd2 = do
+  case record of 
+    (Labels tp pr ps hp dir fc lc ns ls) -> case (List.elem nd2 hp) of
+      True -> return False
+      False -> do 
+        nodemap_record <- select [edgs | ( X n edgs) <- from nodeMapTable (at nd1)  ]
+        let nd_edges = head nodemap_record
+        if (List.elem nd2 nd_edges) then 
+          return True
+        else 
+          return False
+    _ -> error $ " from istreeedge : " ++ show nd1 ++ show nd2
+ 
+
+isTheOnlyNonTreeEdge :: Nd -> Labels-> Nd -> Daison Bool
+isTheOnlyNonTreeEdge nd1 record1 nd2 = do
+    case record1 of
+      Labels trp pr ps hp dir fc lc ns ls ->  do 
+        if (Set.member nd2 hp) && (Set.size hp ==1) then 
+          return True
+        else if (Set.member nd2 hp) && (Set.size hp > 1) then
+          return False
+        else 
+          error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
+      _ -> error " couldnt find record from isonlynontreeedge "
+
+deleteDirectsandAncestors :: Nd ->  Labels-> Nd -> Daison()
+deleteDirectsandAncestors nd1 record1 nd2 = do
+  case record1 of
+    Labels tp pr ps hp dir fc lc ns ls -> do
+      update_ graph1Table (return (nd1, Labels tp pr ps hp (Set.delete nd2 dir) fc lc ns ls ) )
+      when (tp/=0) $ do
+        record <- query firstRow (from graph1Table (at tp))
+        deleteDirectsandAncestors tp record nd2
+    _ -> error $ "invalid from deletedirectss and ancestors " ++ show nd1 ++ show nd2
+
+deleteHopsFrom :: Nd -> Labels -> Nd -> Daison ()
+deleteHopsFrom nd1 record1 nd2 = do
+  case record1 of
+    Labels tp pr ps hp dir fc lc ns ls -> do
+      update_ graph1Table (return (nd1, Labels tp pr ps (Set.delete nd2 hp) dir fc lc ns ls) )
+    _ -> error "invalid"  
+
 
 addHop :: Nd -> Labels -> Nd -> Daison ()
 addHop nd1 (Labels tp pr ps hp dir fc lc ns ls) nd2 = when (nd1 > 0) $ do
@@ -809,23 +857,6 @@ nextPre (PostLabel n) record = if n <=0 then return (0, record)
     (b,bRecord) <- nextOf (PostLabel n) record
     nextPre b bRecord
 
-deleteDirectsandAncestors :: Nd -> Nd -> Daison()
-deleteDirectsandAncestors nd1 nd2 = do
-  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
-  case record of
-    [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps hp (Set.delete nd2 dir) fc lc ns ls ) )
-      when (tp/=0) $ deleteDirectsandAncestors tp nd2
-    _ -> error $ "invalid from deletedirectss and ancestors " ++ show nd1 ++ show nd2
-
-deleteHopsFrom :: Nd -> Nd -> Daison ()
-deleteHopsFrom nd1 nd2 = do
-  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
-  case record of
-    [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
-      update_ graph1Table (return (nd, Labels tp pr ps (Set.delete nd2 hp) dir fc lc ns ls) )
-    _ -> error "invalid"  
-
 
 updateDirectInAncestors :: Nd -> Labels -> (Directs -> Directs) -> Daison ()
 updateDirectInAncestors nd (Labels tp pr ps hp dir fc lc ns ls) f = do
@@ -835,45 +866,6 @@ updateDirectInAncestors nd (Labels tp pr ps hp dir fc lc ns ls) f = do
     updateDirectInAncestors tp record f
 
 
-isTreeEdge :: Nd -> Nd -> Daison Bool
-isTreeEdge nd1 nd2 = do
-  record <- select [label1 | (label1) <- from graph1Table (at nd1)  ] 
-  case record of 
-    [(Labels tp pr ps hp dir fc lc ns ls)] -> case (List.elem nd2 hp) of
-      True -> return False
-      False -> do 
-        nodemap_record <- select [edgs | ( X n edgs) <- from nodeMapTable (at nd1)  ]
-        let nd_edges = head nodemap_record
-        if (List.elem nd2 nd_edges) then 
-          return True
-        else 
-          return False
-    _ -> error $ " from istreeedge : " ++ show nd1 ++ show nd2
- 
-
-isTheOnlyNonTreeEdge :: Nd -> Nd -> Daison Bool
-isTheOnlyNonTreeEdge nd1 nd2 = do
-  record <- select [(nd1,label1) | (label1) <- from graph1Table (at nd1)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels trp pr ps hp dir fc lc ns ls ->  do 
-        if (Set.member nd2 hp) && (Set.size hp ==1) then 
-          return True
-        else if (Set.member nd2 hp) && (Set.size hp > 1) then
-          return False
-        else 
-          error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
-    _ -> error " couldnt find record from isonlynontreeedge "
-
-
-getParent :: Nd -> Daison Nd
-getParent node = do
-  record <- select [(node, labels) | (labels) <- from graph1Table (at node) ] 
-  case record of
-    [] -> error $ "invalid parent node :" ++ show node
-    [(ind1,  label1)] -> case label1 of 
-      (Labels trp _ _ _ _ _ _ _ _ ) -> return trp
-    _           -> error "multiple parents error "
 
 
 queryM :: Nd -> Nd -> Daison Bool
@@ -915,17 +907,5 @@ getEdges nd = do
   record <- select [ edgs| ( X n edgs) <- from nodeMapTable (at nd)  ] 
   return . head $ record
 
-updateDirects :: Nd -> Nd -> Daison()
-updateDirects parent gp = do
-  record <- select [(gp,label1) | (label1) <- from graph1Table (at gp)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels trp pr ps hp dir fc lc ns ls ->  do
-        update_ graph1Table (return (nd, Labels trp pr ps hp (Set.insert parent dir) fc lc ns ls ))
-      _ -> error "updatedirects error"
-    _   -> liftIO $ print record
-  when (gp > 0) $ do
-    ggp <- getParent gp
-    when (ggp > 0) $ updateDirects parent ggp
 
 
