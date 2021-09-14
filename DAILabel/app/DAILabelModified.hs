@@ -737,7 +737,7 @@ removeTreeParent nd1 record1@(Labels tp1 pr1 ps1 hp1 dir1 fc1 lc1 ns1 ls1) nd2 r
                                         lastChild = if lc1 == nd2 then ns2 else lc1
                                       }
   rootRecord <- query firstRow (from graph1Table (at 0))
-  (updatedRootRecord, updatedRecord2) <- verifyAndInsertChild 0 rootRecord nd2 record2{tree_parent = 0}
+  (updatedRootRecord, updatedRecord2) <- verifyAndInsertChild 0 rootRecord nd2 record2{tree_parent = 0, nextSibling = -1}
   store graph1Table (Just 0) updatedRootRecord
   store graph1Table (Just nd2) updatedRecord2
   when (fc2 >0) $ do
