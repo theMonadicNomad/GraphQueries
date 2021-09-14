@@ -651,7 +651,6 @@ handleDelete nd1 nd2 = do
             [record1@(Labels tp pr ps hp dir fc lc ns ls)] -> do
               removeTreeParent nd1 record1{directs = (Set.delete nd2 dir)} nd2 (head res2)
               return()
---      relabel nd2 
         False -> do
           flag <- isTheOnlyNonTreeEdge nd1 (head res1) nd2
           when flag $ do
@@ -883,33 +882,28 @@ updateDirectInAncestors nd (Labels tp pr ps hp dir fc lc ns ls) f = do
     record <- query firstRow (from graph1Table (at tp))
     updateDirectInAncestors tp record f
 
-
-
-
-queryM :: Nd -> Nd -> Daison Bool
-queryM nd1 nd2 = do
-  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
-  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+queryM :: Nd -> Labels-> Nd -> Labels -> Daison Bool
+queryM nd1 label1 nd2 label2 = do
   case label1 of 
-    [(Labels trp1 pre1 post1 hp1 dir1 fc1 lc1 ns1 ls1)] -> do
+    (Labels trp1 pre1 post1 hp1 dir1 fc1 lc1 ns1 ls1) -> do
       case label2 of
-        [(Labels trp2 pre2 post2 hp2 dir2 fc2 lc2 ns2 ls2)] -> if  (pre1 < post2 && post2 <= post1) then return True
+        (Labels trp2 pre2 post2 hp2 dir2 fc2 lc2 ns2 ls2) -> if  (pre1 < post2 && post2 <= post1) then return True
                                              else return False
         _ -> error "error "                
     _ -> error "error again "
 
-
-search :: Nd -> Nd -> Daison Bool
-search nd1 nd2 = do
-  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
+search :: Nd -> Labels -> Nd -> Labels -> Daison Bool
+search nd1 label1 nd2 label2 = do
+{-   label1 <-  query firstRow (from graph1Table (at nd1))
+  label2 <-  query firstRow (from graph1Table (at nd2)) -}
   case label1 of 
-    [(Labels trp1 pre1 post1 hp1 dir1 fc1 lc1 ns1 ls1)] -> do
-      flag <- queryM nd1 nd2
+    (Labels trp1 pre1 post1 hp1 dir1 fc1 lc1 ns1 ls1) -> do
+      flag <- queryM nd1 label1 nd2 label2
       if flag then return True
       else do
-        x <- or <$> (mapM (\x -> search x nd2) (Set.toList hp1)) 
+        x <- or <$> (mapM (\x ->fetchLabels (PreLabel x) >>= \xlabel-> search x xlabel nd2 label2) (Set.toList hp1)) 
         if not x 
-          then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
+          then or <$> (mapM (\x -> fetchLabels (PreLabel x) >>= \xlabel -> queryM x xlabel nd2 label2) (Set.toList dir1)) 
         else return x
 
 dfsearch :: Nd -> Nd -> Daison Bool
