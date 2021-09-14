@@ -450,10 +450,7 @@ updateLabel nd res = do
       (next, nextRecord) <- nextNode nd res{preL = pr, postL = ps}
       when (next > 0) $ updateLabel next nextRecord
   return()
-  where 
-    average x y = x + div (y-x) 2 
  
-
 handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
@@ -562,43 +559,7 @@ handleInsert nd1 nd2 = do
     (X pnd edges) ->  store nodeMapTable (Just nd1) (X pnd (nd2:edges))
   return()
 --  store nodeMapTable (Just parent) (X pnd (List.nub (nd:edges)))
-  where 
-    average x y = x + div (y-x) 2    
-    verifyAndInsertChild nd1 record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _) nd2 record2@(Labels tp2 _ _ _ _ _ _ _ _ ) = do 
-      if(lc1 < 0) then do 
-        if (ps1-pr1 <=2) then do 
-          reLabelMain (PreLabel nd1) record1
-          updatedRes1 <- query firstRow (from graph1Table (at nd1))
-          case updatedRes1 of
-            updatedRecord1@(Labels _ upr ups _ _ _ _ _ _ ) -> do
-              let pre = average upr ups
-                  post=  average pre ups
-              return (updatedRecord1{firstChild = nd2, lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post}  )
-          else do 
-            let pre = average pr1 ps1 
-                post = average pre ps1
-            return (record1{firstChild = nd2, lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post}  )  
-        else do 
-          lc1Record <- query firstRow (from graph1Table (at lc1))
-          case lc1Record of
-            (Labels _ _ lps _ _ _ _ _ _) -> do 
-              if(ps1-lps <=2) then do
-                reLabelMain (PostLabel lc1) lc1Record
-                updatedRes1 <- query firstRow (from graph1Table (at nd1))
-                case updatedRes1 of
-                  updatedRecord1@(Labels _ upr ups _ _ _ _ _ _ ) -> do
-                    ulc1Record <- query firstRow (from graph1Table (at lc1))
-                    case ulc1Record of
-                      (Labels _ _ ulps _ _ _ _ _ _ ) -> do
-                        let pre = average ulps ups
-                            post=  average pre ups
-                        update_ graph1Table (return (lc1, ulc1Record{nextSibling = nd2}))
-                        return (updatedRecord1{ lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post,lastSibling = lc1 }  )
-              else do
-                let pre = average lps ps1
-                    post= average pre ps1
-                update_ graph1Table (return (lc1, lc1Record{nextSibling = nd2}))
-                return (record1{ lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post,lastSibling = lc1 }  )
+  where     
     insert2IsolatedNodes nd1 nd2 = do 
       res <- query firstRow (from graph1Table (at 0))
       case res of 
@@ -635,6 +596,45 @@ handleInsert nd1 nd2 = do
                 return (pre1,pre2,post1,post2,rlc )
 
 
+average x y = x + div (y-x) 2
+
+verifyAndInsertChild nd1 record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _) nd2 record2@(Labels tp2 _ _ _ _ _ _ _ _ ) = do 
+      if(lc1 < 0) then do 
+        if (ps1-pr1 <=2) then do 
+          reLabelMain (PreLabel nd1) record1
+          updatedRes1 <- query firstRow (from graph1Table (at nd1))
+          case updatedRes1 of
+            updatedRecord1@(Labels _ upr ups _ _ _ _ _ _ ) -> do
+              let pre = average upr ups
+                  post=  average pre ups
+              return (updatedRecord1{firstChild = nd2, lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post}  )
+          else do 
+            let pre = average pr1 ps1 
+                post = average pre ps1
+            return (record1{firstChild = nd2, lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post}  )  
+        else do 
+          lc1Record <- query firstRow (from graph1Table (at lc1))
+          case lc1Record of
+            (Labels _ _ lps _ _ _ _ _ _) -> do 
+              if(ps1-lps <=2) then do
+                reLabelMain (PostLabel lc1) lc1Record
+                updatedRes1 <- query firstRow (from graph1Table (at nd1))
+                case updatedRes1 of
+                  updatedRecord1@(Labels _ upr ups _ _ _ _ _ _ ) -> do
+                    ulc1Record <- query firstRow (from graph1Table (at lc1))
+                    case ulc1Record of
+                      (Labels _ _ ulps _ _ _ _ _ _ ) -> do
+                        let pre = average ulps ups
+                            post=  average pre ups
+                        update_ graph1Table (return (lc1, ulc1Record{nextSibling = nd2}))
+                        return (updatedRecord1{ lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post,lastSibling = lc1 }  )
+              else do
+                let pre = average lps ps1
+                    post= average pre ps1
+                update_ graph1Table (return (lc1, lc1Record{nextSibling = nd2}))
+                return (record1{ lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post,lastSibling = lc1 }  )
+
+
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
@@ -647,7 +647,10 @@ handleDelete nd1 nd2 = do
       case istreeEdge of
         True -> do
           deleteDirectsandAncestors nd1 (head res1) nd2
-          removeTreeParent nd2
+          case res1 of 
+            [record1@(Labels tp pr ps hp dir fc lc ns ls)] -> do
+              removeTreeParent nd1 record1{directs = (Set.delete nd2 dir)} nd2 (head res2)
+              return()
 --      relabel nd2 
         False -> do
           flag <- isTheOnlyNonTreeEdge nd1 (head res1) nd2
@@ -720,12 +723,27 @@ deleteEdge nd1 nd2 = do
         _            -> error $ show nd1 ++ " -  " ++ show nd2 ++ " is not an edge"
 
 
-removeTreeParent :: Nd -> Daison ()
-removeTreeParent nd1 = do 
-  record <- select [(nd1, labels) | (labels) <- from graph1Table (at nd1)  ] 
-  case record of
-    [(nd , Labels tp pr ps hp dir fc lc ns ls)] -> do
-      update_ graph1Table (return (nd, Labels 0 pr ps hp dir fc lc ns ls) )
+removeTreeParent :: Nd -> Labels-> Nd -> Labels-> Daison ()
+removeTreeParent nd1 record1@(Labels tp1 pr1 ps1 hp1 dir1 fc1 lc1 ns1 ls1) nd2 record2@(Labels tp2 pr2 ps2 hp2 dir2 fc2 lc2 ns2 ls2) = do 
+  when (ls2 >0) $ do
+    ls2Record <- query firstRow (from graph1Table (at ls2))
+    store graph1Table (Just ls2) ls2Record{ nextSibling = ns2}
+    return ()
+  when (ns2 >0) $ do
+    ns2Record <- query firstRow (from graph1Table (at ns2))
+    store graph1Table (Just ns2) ns2Record{ lastSibling = ls2}
+    return ()
+  store graph1Table (Just nd1) record1{ firstChild = if fc1 == nd2 then ns2 else fc1,
+                                        lastChild = if lc1 == nd2 then ns2 else lc1
+                                      }
+  rootRecord <- query firstRow (from graph1Table (at 0))
+  (updatedRootRecord, updatedRecord2) <- verifyAndInsertChild 0 rootRecord nd2 record2{tree_parent = 0}
+  store graph1Table (Just 0) updatedRootRecord
+  store graph1Table (Just nd2) updatedRecord2
+  when (fc2 >0) $ do
+    fc2Record <- query firstRow (from graph1Table (at fc2))
+    updateLabel fc2 fc2Record
+  return()
     
 
 reLabelMain :: PrePostRef -> Labels -> Daison ()
