@@ -613,7 +613,7 @@ search nd1 nd2 = do
       flag <- queryM nd1 nd2
       if flag then return True
       else do
-        x <- or <$> (mapM (\x -> queryM x nd2) (Set.toList hp1)) 
+        x <- or <$> (mapM (\x -> search x nd2) (Set.toList hp1)) 
         if not x 
           then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
         else return x

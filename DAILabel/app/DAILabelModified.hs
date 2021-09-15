@@ -337,7 +337,9 @@ main1  :: Int64 -> Double -> IO ()
 main1 n d= do
   removeFile databaseTest
   IO.hSetBuffering IO.stdin IO.NoBuffering
-  Graph g1 <- generateGraph1 n d
+--  Graph g1 <- generateGraph1 n d
+  let Graph g1 = generateGraph n d
+
   print $ show g1
   db <- openDB databaseTest
   (a,b,c)  <- runDaison db ReadWriteMode $ do
@@ -808,7 +810,6 @@ reLabelNodes begin beginRecord v end n i = do
       else do
         (newbegin,newbeginRecord) <- nextOf (begin) beginRecord
         reLabelNodes newbegin newbeginRecord v end n (i +1)
-
 
 fetchLabels (PreLabel nd) = query firstRow (from graph1Table (at nd))
 fetchLabels (PostLabel nd) = query firstRow (from graph1Table (at nd))

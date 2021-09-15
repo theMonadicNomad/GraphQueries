@@ -71,7 +71,7 @@ generateGraph1 n p = do
   return $ Graph g
     where
         restList genV x = do
-          (vs, ugen) <- ranValues genV (fromEnum $ (n-x)) 0.0 1.0
+          (vs, ugen) <- ranValues genV ( fromEnum $  (n-x)) 0.0 1.0
           let vs' =
                 zipWith (\v i -> if v <= p
                               then Just i
@@ -85,7 +85,9 @@ ranValues gen n a b = do
   let values = take n (randomRs (a,b) gen )
   putStrLn $ show (values)
   let (_,newGen) = random gen :: (Double, StdGen)
+  putStrLn $ show (newGen ) 
   return (values, newGen)
+
 
 
 
