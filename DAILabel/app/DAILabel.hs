@@ -24,7 +24,7 @@ import System.Directory
 import qualified Data.Bits as Bits
 import Data.Int
 import Data.Time
-
+import Data.Maybe
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
 type Ndc = Char
@@ -96,8 +96,8 @@ graph2 = Graph
       ( C 'h', [ C 'k' ] ),
       ( C 'i', [ C 'k' ] ),
       ( C 'j', [ C 'k' ] ),
-      ( C 'k', [] ),
-      (C 'm', [ C 'a' ])
+      ( C 'k', [] ){- ,
+      (C 'm', [ C 'a' ]) -}
     ]
 graph10 :: Graph Node 
 graph10 = Graph 
@@ -392,7 +392,8 @@ handleInsert nd1 nd2 = do
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)                        -- Case 1.1.2
               update_ graph1Table (return (nd2, record2{tree_parent=nd1}))
               resetCounter
-              reLabelAll allnodes [] 'n'
+              reLabelprocess
+--              reLabelAll allnodes [] 'n'
               x <- getCounter
               return ()
           | otherwise -> do  
@@ -408,7 +409,8 @@ handleInsert nd1 nd2 = do
              (pre,post) <- insertIsolatedNode
              store graph1Table (Just nd2) (Labels nd1 pre post Set.empty Set.empty)
              resetCounter
-             reLabelAll (allnodes) [] 'n'
+             reLabelprocess
+             --reLabelAll (allnodes) [] 'n'
              return ()
 
     ([]                                       ,[record2@(Labels tp2 _ _ hp2 dir2 )])     -- Case 3
@@ -427,7 +429,8 @@ handleInsert nd1 nd2 = do
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)
               resetCounter
               --reLabelAll (allnodes) [] 'n'
-              relabel nd1 [] 'n'
+--              relabel nd1 [] 'n'
+              reLabelprocess
               return ()
     ([]                                       ,[]                                          ) ->  -- Case 4
           do 
@@ -641,7 +644,7 @@ relabel nd visited t =  do
   x <- updatePre nd visited
   if x then return visited
        else do
-         edges <- {- if t == 's' then getTreeEdges nd else -} getEdges nd
+         edges <-  {- if t == 's' then getTreeEdges nd else -}  getEdges nd
          --getTree Edges is used to relabel the spanning tree when an edge is deleted in case 1
          --getEdges is used to relabel the whole spanning tree
          nv <- case edges of
@@ -674,18 +677,18 @@ updatePost nd = do
         update_ graph1Table (return (nd, Labels trp pr (c_counter*gap) hp dir ))
       _   -> error "error from updatepost"
     _ -> error "error " 
-
-
-{- 
-getTreeEdges :: Nd -> Daison [Nd]
+ 
+{- getTreeEdges :: Nd -> Daison [Nd]
 getTreeEdges nd = do 
   record <- select [ treeEdges edgs | ( X n edgs) <- from nodeMapTable (at nd)  ] 
   record1 <- head record
+  label  <- fetchLabels nd
   return record1
   where
-    treeEdges es = filterM (\nd2 -> isTreeEdge nd nd2 ) es -}
-
-
+    treeEdges es = filterM (\nd2 -> isTreeEdge nd label nd2 ) es 
+    
+      
+fetchLabels (nd) = query firstRow (from graph1Table (at nd)) -}
 
 getEdges :: Nd -> Daison [Nd]
 getEdges nd = do 
@@ -704,3 +707,29 @@ updateDirects parent gp = do
   when (gp > 0) $ do
     ggp <- getParent gp
     when (ggp > 0) $ updateDirects parent ggp
+
+
+reLabelprocess ::  Daison ()
+reLabelprocess  = do
+  a <- select [ (ind, edges) | (ind, ( X nd edges )) <- from nodeMapTable everything ]
+  foldM_ (\(index, visited) x -> do 
+    (index', visited') <- reLabelprocessNodes (Map.fromList a) index x visited
+    return (index', visited')) (0, []) a 
+
+reLabelprocessNodes :: GraphMap Nd -> Int64 -> (Nd,[Nd]) ->[Nd] -> Daison (Int64, [Nd])
+reLabelprocessNodes graph index (nd,edges) visited  = do
+  case (elem nd visited) of
+    True -> return (index, visited)
+    False -> do
+      record <- query firstRow (from graph1Table (at nd))
+      case record of
+        (Labels _ _ _ _ _) -> do 
+          (index1, visited') <- foldM (\(i, vis) child -> do
+                                        let edges = fromMaybe [] (Map.lookup child graph)
+                                        (i',vis') <- reLabelprocessNodes graph i (child,edges) vis
+                                        return (i', vis'))
+                                      (index+1, nd:visited)
+                                      edges
+          store graph1Table (Just nd) record{preL = index, postL = index1}
+          return (index1+1, visited' )  
+                                  
