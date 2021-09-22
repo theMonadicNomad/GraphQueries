@@ -135,38 +135,38 @@ ranValues12  gen n  = do
   return (values, newGen)
 
 
-generateTreeGraph :: Int64 -> Int64 -> Int64 -> IO (Graph Node)
-generateTreeGraph n total curr = do
+generateTreeGraph :: Int64 -> Int64 -> IO (Graph Node)
+generateTreeGraph  total n  = do
   if total == 0
     then return $ Graph []
     else do
-      let rt = curr 
-      (lrt , ch) <- genChild (total, curr + 1 , n) rt
+      let rt = 1 
+      (lrt , ch) <- genChild (total,  rt + 1 , n) rt
       let rest = (\x -> (I x, [])) <$> ([lrt+1 .. total])
       final <- mapM (addMoreEdges total n) (ch ++ rest)
       return $ Graph final
 
 addMoreEdges :: Int64 -> Int64 -> (Node, [Node]) -> IO (Node, [Node])
-addMoreEdges total n (I x, []) =
-  if x == total
+addMoreEdges total n (I x, []) = if x == total 
     then return (I x , [])
     else do
       gen <- newStdGen
-      ls <- mapM (\_ -> do
-        gn <- newStdGen
-        return $ fst (randomR (x + 1, total) gn)) [1..(fst $ randomR (0, n) gen)]
+      let (nv,gen') = randomR (0,n) gen
+          ls = take (fromEnum nv) (randomRs (x+1,total) gen') 
       return (I x, I <$> (sort $ nub ls))
 addMoreEdges total n (I x, ls) = do
-  let I ns = last ls
   gen <- newStdGen
-  ls' <- mapM (\_ -> do
+  let I ns = last ls
+      (nv,gen') = randomR (0,n) gen
+      ls' = if (ns==total) then [] else take (fromEnum nv) (randomRs (ns+1,total) gen') 
+{-   ls' <- mapM (\_ -> do
     gn <- newStdGen
-    return $ fst (randomR (ns + 1, total) gn)) [1..(fst $ randomR (0, n) gen)]
-  return (I x, ls ++ (I <$> (sort ls')))
+    return $ fst (randomR (ns + 1, total) gn)) [1..(fst $ randomR (0, n) gen)] -}
+  return (I x, ls ++ (I <$> (sort $ nub ls')))
 
 genChild :: (Int64, Int64, Int64) -> Int64 -> IO (Int64, [(Node, [Node])])
 genChild (total, curr, n) rt = do
-  children <- generateChildren n curr
+  children <- generateChildren n curr total
   let curr' = if null children && curr - 1 == rt
                 then curr + 1
                 else curr + (fromIntegral (length children ))
@@ -177,9 +177,10 @@ genChild (total, curr, n) rt = do
         genChild (total, curr', n) (rt+1) 
   return (rt', (I rt,children) : ch)
 
-generateChildren :: Int64 -> Int64 -> IO [Node]
-generateChildren n c =   do
+generateChildren :: Int64 -> Int64 -> Int64-> IO [Node]
+generateChildren n c total =   do
   gen <- newStdGen
   let values = fst $ (randomR (1,n) gen )
   -- putStrLn $ show (values)
-  return (I <$> [c .. (c + values - 1)] )
+--  return (I <$> [c .. ( if (c + values - 1)> total then total else (c+values-1)) ] )
+  return (I <$> [c .. (mod (c+ values-1) total) ] )
