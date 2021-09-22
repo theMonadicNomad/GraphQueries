@@ -82,3 +82,33 @@ Dynamic Process:
 
 
 
+a for AILabel
+d for DAILabel
+m for DAILabelModified
+Enter your choice : 
+a"fromList [(C 'a',[C 'b',C 'c']),(C 'b',[C 'd',C 'e',C 'f']),(C 'c',[C 'h']),(C 'd',[C 'k']),(C 'e',[C 'g',C 'h']),(C 'f',[C 'g']),(C 'g',[C 'i',C 'j']),(C 'h',[C 'k']),(C 'i',[C 'k']),(C 'j',[C 'k']),(C 'k',[])]"
+0.000974s
+-------------------
+(1, Pre: 3 Post:  4 Hops: fromList [] Directs:  fromList [])
+(2, Pre: 2 Post:  5 Hops: fromList [] Directs:  fromList [])
+(3, Pre: 8 Post:  9 Hops: fromList [1] Directs:  fromList [3])
+(4, Pre: 10 Post:  11 Hops: fromList [1] Directs:  fromList [4])
+(5, Pre: 7 Post:  12 Hops: fromList [] Directs:  fromList [3,4])
+(6, Pre: 13 Post:  14 Hops: fromList [1] Directs:  fromList [6])
+(7, Pre: 6 Post:  15 Hops: fromList [] Directs:  fromList [3,4,6])
+(8, Pre: 16 Post:  17 Hops: fromList [5] Directs:  fromList [8])
+(9, Pre: 1 Post:  18 Hops: fromList [] Directs:  fromList [3,4,6,8])
+(10, Pre: 19 Post:  20 Hops: fromList [6] Directs:  fromList [10])
+(11, Pre: 0 Post:  21 Hops: fromList [] Directs:  fromList [3,4,6,8,10])
+(1,X {nd = C 'k', edges = []})
+(2,X {nd = C 'd', edges = [1]})
+(3,X {nd = C 'i', edges = [1]})
+(4,X {nd = C 'j', edges = [1]})
+(5,X {nd = C 'g', edges = [4,3]})
+(6,X {nd = C 'h', edges = [1]})
+(7,X {nd = C 'e', edges = [6,5]})
+(8,X {nd = C 'f', edges = [5]})
+(9,X {nd = C 'b', edges = [8,7,2]})
+(10,X {nd = C 'c', edges = [6]})
+(11,X {nd = C 'a', edges = [10,9]})
+"Time for AILabel  for n : 0 d 0.0 : 0.000974s"
