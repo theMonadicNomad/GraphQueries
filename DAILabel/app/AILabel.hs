@@ -165,13 +165,62 @@ generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
 
-main1 :: Int64 -> Double -> IO ()
+generateTreeGraph :: Int64 -> Int64 -> IO (Graph Node)
+generateTreeGraph  total n  = do
+  if total == 0
+    then return $ Graph []
+    else do
+      let rt = 1 
+      (lrt , ch) <- genChild (total,  rt + 1 , n) rt
+      let rest = (\x -> (I x, [])) <$> ([lrt+1 .. total])
+      final <- mapM (addMoreEdges total n) (ch ++ rest)
+      return $ Graph final
+
+addMoreEdges :: Int64 -> Int64 -> (Node, [Node]) -> IO (Node, [Node])
+addMoreEdges total n (I x, []) = if x == total 
+    then return (I x , [])
+    else do
+      gen <- newStdGen
+      let (nv,gen') = randomR (0,n) gen
+          ls = take (fromEnum nv) (randomRs (x+1,total) gen') 
+      return (I x, I <$> (List.sort $ List.nub ls))
+addMoreEdges total n (I x, ls) = do
+  gen <- newStdGen
+  let I ns = last ls
+      (nv,gen') = randomR (0,n) gen
+      ls' = if (ns==total) then [] else take (fromEnum nv) (randomRs (ns+1,total) gen') 
+  return (I x, ls ++ (I <$> (List.sort $ List.nub ls')))
+
+genChild :: (Int64, Int64, Int64) -> Int64 -> IO (Int64, [(Node, [Node])])
+genChild (total, curr, n) rt = do
+  children <- generateChildren n curr total
+  let curr' = if null children && curr - 1 == rt
+                then curr + 1
+                else curr + (fromIntegral (length children ))
+  (rt',ch) <-
+    if total <= curr'
+      then return (rt, [])
+      else do
+        genChild (total, curr', n) (rt+1) 
+  return (rt', (I rt,children) : ch)
+
+generateChildren :: Int64 -> Int64 -> Int64-> IO [Node]
+generateChildren n c total =   do
+  gen <- newStdGen
+  let values = fst $ (randomR (1,n) gen )
+  -- putStrLn $ show (values)
+  return (I <$> [c .. (mod (c+ values-1) total) ] )
+
+
+
+
+main1 :: Int64 -> Int64 -> IO ()
 main1 n d = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
-  let Graph g1 = generateGraph n d
+  Graph g1 <- generateTreeGraph n d
   let Graph g = graph2
   let graphmap1 | n == 0 = Map.fromList g
-                  | otherwise = Map.fromList g1
+                | otherwise = Map.fromList g1
   print $ show graphmap1
   removeFile databaseTest
 
@@ -194,6 +243,7 @@ main1 n d = do
   print $ "Time for AILabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show z
 
   closeDB db
+  makeDynamicOperation databaseTest ReadWriteMode
 
 
     
@@ -225,6 +275,57 @@ processNodes graph index (nd,edges) = do
     [id] -> return (index,id,Nothing)
 
 
+getNdIndex node = do
+  nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
+  case nod of
+    [nd] -> return nd
+    []   -> error $ "no such node in the database" ++ show nod
+    _    -> error $ "ivalid getindex nd :" ++ show nod
+
+
+
+
+makeDynamicOperation :: String -> AccessMode -> IO()
+makeDynamicOperation test_db readwritemode = do
+    IO.hSetBuffering IO.stdin IO.NoBuffering
+{-     putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion : ")
+    choice <- getChar -}
+    putStrLn (" Enter the first node to search : ")
+    firstChar <- getLine
+    putStrLn (" Enter the second node : ")
+    secondChar <- getLine
+    db <- openDB test_db  
+    (a,b) <- runDaison db readwritemode $ do 
+      nd1 <- getNdIndex (I (read firstChar :: Int64))
+      nd2 <- getNdIndex (I (read secondChar :: Int64))
+      start <- liftIO $ getCurrentTime
+      flag <- dfsearch nd1 nd2
+      end <- liftIO $ getCurrentTime
+      let timePassed = diffUTCTime end start  
+      --liftIO $ print timePassed
+      liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
+      start1 <- liftIO $ getCurrentTime
+      flag1 <- search nd1 nd2
+      end1 <- liftIO $ getCurrentTime
+      let timePassed1 = diffUTCTime end1 start1  
+      --liftIO $ print timePassed
+      liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for  AILabel Search : "++show timePassed1
+
+
+
+      x <- select [ x | x <- from graph1Table everything ] 
+      y <- select [ x | x <- from nodeMapTable everything ]
+      return (x,y)
+    putStrLn "make dynamic" 
+--    mapM_ (\y -> putStrLn (show y) ) a
+--    mapM_ (\y -> putStrLn (show y) ) b
+    closeDB db
+    makeDynamicOperation test_db readwritemode
+
+
+
+
+
 queryM :: Nd -> Nd -> Daison Bool
 queryM nd1 nd2 = do
   label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
@@ -247,7 +348,7 @@ search nd1 nd2 = do
       flag <- queryM nd1 nd2
       if flag then return True
       else do
-        x <- or <$> (mapM (\x -> queryM x nd2) (Set.toList hp1)) 
+        x <- or <$> (mapM (\x -> search x nd2) (Set.toList hp1)) 
         if not x 
           then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
         else return x
@@ -255,10 +356,12 @@ search nd1 nd2 = do
 dfsearch :: Nd -> Nd -> Daison Bool
 dfsearch nd1 nd2 = do 
   record <- select [edgs | (X n edgs) <- from nodeMapTable (at nd1)  ] 
+{-   liftIO  $ print  $ " from liftio graph " ++ show record ++ " for node : " ++ show nd1 -}
   case (head record) of
     lis@(first : rest) -> case (List.elem nd2 lis) of
       True -> return True
       False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
+    [] -> return False
 
 
 
