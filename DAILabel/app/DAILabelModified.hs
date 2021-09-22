@@ -302,6 +302,7 @@ ranValues gen n a b = do
   let values = take n (randomRs (a,b) gen )
   putStrLn $ show (values)
   let (_,newGen) = random gen :: (Double, StdGen)
+  putStrLn $ show newGen
   return (values, newGen)
 
 
@@ -333,12 +334,12 @@ main = do
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
 
-main1  :: Int64 -> Double -> IO ()
+main1  :: Int64 -> Int64 -> IO ()
 main1 n d= do
   removeFile databaseTest
   IO.hSetBuffering IO.stdin IO.NoBuffering
---  Graph g1 <- generateGraph1 n d
-  let Graph g1 = generateGraph n d
+  Graph g1 <- generateTreeGraph n d
+--  let Graph g1 = generateGraph n d
 
   print $ show g1
   db <- openDB databaseTest
@@ -361,6 +362,55 @@ main1 n d= do
   print $ "Time for  DaiLabel modified for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
+
+
+generateTreeGraph :: Int64 -> Int64 -> IO (Graph Node)
+generateTreeGraph  total n  = do
+  if total == 0
+    then return $ Graph []
+    else do
+      let rt = 1 
+      (lrt , ch) <- genChild (total,  rt + 1 , n) rt
+      let rest = (\x -> (I x, [])) <$> ([lrt+1 .. total])
+      final <- mapM (addMoreEdges total n) (ch ++ rest)
+      return $ Graph final
+
+addMoreEdges :: Int64 -> Int64 -> (Node, [Node]) -> IO (Node, [Node])
+addMoreEdges total n (I x, []) = if x == total 
+    then return (I x , [])
+    else do
+      gen <- newStdGen
+      let (nv,gen') = randomR (0,n) gen
+          ls = take (fromEnum nv) (randomRs (x+1,total) gen') 
+      return (I x, I <$> (List.sort $ List.nub ls))
+addMoreEdges total n (I x, ls) = do
+  gen <- newStdGen
+  let I ns = last ls
+      (nv,gen') = randomR (0,n) gen
+      ls' = if (ns==total) then [] else take (fromEnum nv) (randomRs (ns+1,total) gen') 
+  return (I x, ls ++ (I <$> (List.sort $ List.nub ls')))
+
+genChild :: (Int64, Int64, Int64) -> Int64 -> IO (Int64, [(Node, [Node])])
+genChild (total, curr, n) rt = do
+  children <- generateChildren n curr total
+  let curr' = if null children && curr - 1 == rt
+                then curr + 1
+                else curr + (fromIntegral (length children ))
+  (rt',ch) <-
+    if total <= curr'
+      then return (rt, [])
+      else do
+        genChild (total, curr', n) (rt+1) 
+  return (rt', (I rt,children) : ch)
+
+generateChildren :: Int64 -> Int64 -> Int64-> IO [Node]
+generateChildren n c total =   do
+  gen <- newStdGen
+  let values = fst $ (randomR (1,n) gen )
+  -- putStrLn $ show (values)
+  return (I <$> [c .. (mod (c+ values-1) total) ] )
+
+
 
 
 generateGraph :: Int64 -> Double ->Graph Node
@@ -396,8 +446,19 @@ makeDynamicOperation test_db readwritemode = do
         'i' -> handleInsert nd1 nd2
         'd' -> handleDelete nd1 nd2 
         's' -> do 
+          start <- liftIO $ getCurrentTime
           flag <- dfsearch nd1 nd2
-          liftIO $ print  $ " search result : " ++ show flag
+          end <- liftIO $ getCurrentTime
+          let timePassed = diffUTCTime end start  
+          --liftIO $ print timePassed
+          liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
+          start1 <- liftIO $ getCurrentTime
+          flag1 <- fetchLabels (PreLabel nd1) >>= \label1 -> fetchLabels (PreLabel nd2) >>= \label2 -> search nd1  label1 nd2 label2
+          end1 <- liftIO $ getCurrentTime
+          let timePassed1 = diffUTCTime end1 start1  
+          --liftIO $ print timePassed
+          liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for  AILabel Search : "++show timePassed1
+
         'r' ->  do
           dropTable graph1Table
           dropTable nodeMapTable
@@ -914,6 +975,7 @@ dfsearch nd1 nd2 = do
     lis@(first : rest) -> case (List.elem nd2 lis) of
       True -> return True
       False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
+    [] -> return False
  
 getEdges :: Nd -> Daison [Nd]
 getEdges nd = do 

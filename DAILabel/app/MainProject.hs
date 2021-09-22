@@ -53,7 +53,7 @@ main = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
   putStrLn ("Enter the number of nodes : ")
   inp_1 <- getLine
-  putStrLn (" Enter the density : ")
+  putStrLn (" Enter the maximum number of tree edges a node can have : ")
   inp_2 <- getLine
   putStrLn ("a for AILabel")
   putStrLn ("d for DAILabel")
@@ -62,7 +62,7 @@ main = do
   putStrLn ("Enter your choice : ")
   process_char <- getChar
   let n = (read inp_1 :: Int64)
-  let d = (read inp_2 :: Double)
+  let d = (read inp_2 :: Int64)
   case process_char of
     'a' -> AILabel.main1 n d
     'd' -> DAILabel.main1 n d
