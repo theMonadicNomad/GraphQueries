@@ -446,18 +446,19 @@ makeDynamicOperation test_db readwritemode = do
         'i' -> handleInsert nd1 nd2
         'd' -> handleDelete nd1 nd2 
         's' -> do 
+          start1 <- liftIO $ getCurrentTime
+          flag1 <- fetchLabels (PreLabel nd1) >>= \label1 -> fetchLabels (PreLabel nd2) >>= \label2 -> search nd1  label1 nd2 label2
+          end1 <- liftIO $ getCurrentTime
+          let timePassed1 = diffUTCTime end1 start1  
+          --liftIO $ print timePassed
+          liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  DAILabelModified Search : "++show timePassed1
+
           start <- liftIO $ getCurrentTime
           flag <- dfsearch nd1 nd2
           end <- liftIO $ getCurrentTime
           let timePassed = diffUTCTime end start  
           --liftIO $ print timePassed
           liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
-          start1 <- liftIO $ getCurrentTime
-          flag1 <- fetchLabels (PreLabel nd1) >>= \label1 -> fetchLabels (PreLabel nd2) >>= \label2 -> search nd1  label1 nd2 label2
-          end1 <- liftIO $ getCurrentTime
-          let timePassed1 = diffUTCTime end1 start1  
-          --liftIO $ print timePassed
-          liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for  AILabel Search : "++show timePassed1
 
         'r' ->  do
           dropTable graph1Table
@@ -974,7 +975,7 @@ dfsearch nd1 nd2 = do
   case (head record) of
     lis@(first : rest) -> case (List.elem nd2 lis) of
       True -> return True
-      False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
+      False -> or <$> (mapM (\x -> dfsearch x nd2) lis)
     [] -> return False
  
 getEdges :: Nd -> Daison [Nd]

@@ -140,6 +140,19 @@ graph2 = Graph
       ( C 'k', [] )
     ]
 
+graph12 :: Graph Node
+graph12 = Graph
+    [ (I 1, [ I 2, I 3] ),
+      (I 2, [ ] ),
+      (I 3, [I 5]),
+      (I 4, [I 5]),
+      (I 5, [] )
+    ]
+ 
+
+
+
+
 
 instance Show Labels where
   show (Labels {- a -} b c d e) = {- "TP: " ++  show a ++ -} " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e 
@@ -218,7 +231,7 @@ main1 :: Int64 -> Int64 -> IO ()
 main1 n d = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
   Graph g1 <- generateTreeGraph n d
-  let Graph g = graph2
+  let Graph g = graph12
   let graphmap1 | n == 0 = Map.fromList g
                 | otherwise = Map.fromList g1
   print $ show graphmap1
@@ -298,18 +311,19 @@ makeDynamicOperation test_db readwritemode = do
     (a,b) <- runDaison db readwritemode $ do 
       nd1 <- getNdIndex (I (read firstChar :: Int64))
       nd2 <- getNdIndex (I (read secondChar :: Int64))
+      start1 <- liftIO $ getCurrentTime
+      flag1 <- search nd1 nd2
+      end1 <- liftIO $ getCurrentTime
+      let timePassed1 = diffUTCTime end1 start1  
+      --liftIO $ print timePassed
+      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+
       start <- liftIO $ getCurrentTime
       flag <- dfsearch nd1 nd2
       end <- liftIO $ getCurrentTime
       let timePassed = diffUTCTime end start  
       --liftIO $ print timePassed
       liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
-      start1 <- liftIO $ getCurrentTime
-      flag1 <- search nd1 nd2
-      end1 <- liftIO $ getCurrentTime
-      let timePassed1 = diffUTCTime end1 start1  
-      --liftIO $ print timePassed
-      liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for  AILabel Search : "++show timePassed1
 
 
 
@@ -360,7 +374,7 @@ dfsearch nd1 nd2 = do
   case (head record) of
     lis@(first : rest) -> case (List.elem nd2 lis) of
       True -> return True
-      False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
+      False -> or <$> (mapM (\x -> dfsearch x nd2) lis)
     [] -> return False
 
 
