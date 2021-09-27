@@ -146,7 +146,10 @@ graph12 = Graph
       (I 2, [ ] ),
       (I 3, [I 5]),
       (I 4, [I 5]),
-      (I 5, [] )
+      (I 5, [I 6] ),
+      (I 6, [ I 7] ),
+      (I 7, [ ] ),
+      (I 8, [] )
     ]
  
 
@@ -178,15 +181,15 @@ generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
 
-generateTreeGraph :: Int64 -> Int64 -> IO (Graph Node)
-generateTreeGraph  total n  = do
+generateTreeGraph :: Int64 -> Int64 -> Int64-> IO (Graph Node)
+generateTreeGraph  total n p  = do
   if total == 0
     then return $ Graph []
     else do
       let rt = 1 
       (lrt , ch) <- genChild (total,  rt + 1 , n) rt
       let rest = (\x -> (I x, [])) <$> ([lrt+1 .. total])
-      final <- mapM (addMoreEdges total n) (ch ++ rest)
+      final <- mapM (addMoreEdges total p) (ch ++ rest)
       return $ Graph final
 
 addMoreEdges :: Int64 -> Int64 -> (Node, [Node]) -> IO (Node, [Node])
@@ -227,11 +230,11 @@ generateChildren n c total =   do
 
 
 
-main1 :: Int64 -> Int64 -> IO ()
-main1 n d = do
+main1 :: Int64 -> Int64 ->Int64-> IO ()
+main1 n d p = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
-  Graph g1 <- generateTreeGraph n d
-  let Graph g = graph12
+  Graph g1 <- generateTreeGraph n d p
+  let Graph g = graph2
   let graphmap1 | n == 0 = Map.fromList g
                 | otherwise = Map.fromList g1
   print $ show graphmap1
@@ -248,6 +251,7 @@ main1 n d = do
     liftIO $ print timePassed
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
+    makeDynamic n
     return (x,y,timePassed)
 
   putStrLn "-------------------"
@@ -296,6 +300,56 @@ getNdIndex node = do
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
 
+makeDynamic  :: Int64 -> Daison ()
+makeDynamic p = do
+  liftIO $ print $  "Enter number of searches : "
+  firstChar <- liftIO $ getLine
+  let n = read firstChar :: Int64
+  foldM_ (\_ m -> do 
+                      (x,y) <- liftIO $ getRandomNodes p
+                      resx <- select (from nodemap_index (at x))
+                      resy <- select (from nodemap_index (at y))
+                      processSearching (head resx) (head resy)
+                      return ()                    
+                   )
+                   ()
+                   [1..n]
+  makeDynamic p
+
+getRandomNodes :: Int64 -> IO(Node,Node)
+getRandomNodes n = do 
+      gen <- newStdGen
+      let a:b:_ = take 2 (randomRs (1,n) gen) 
+      if (a<b) then return (I a,I b) else return (I b,I a)
+
+processSearching :: Nd ->Nd-> Daison()
+processSearching nd1  nd2 = do 
+    liftIO $ print  $ " nd1:  " ++ show nd1 ++ " nd2: " ++ show nd2
+
+    start1 <- liftIO $ getCurrentTime
+    flag1 <- search nd1 nd2
+    end1 <- liftIO $ getCurrentTime
+    let timePassed1 = diffUTCTime end1 start1  
+    --liftIO $ print timePassed
+    liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+
+    start <- liftIO $ getCurrentTime
+    (flag, count) <- df_search nd1 nd2 0
+    end <- liftIO $ getCurrentTime
+    let timePassed = diffUTCTime end start  
+    --liftIO $ print timePassed
+    liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
+
+    start2 <- liftIO $ getCurrentTime
+    (flag2) <- dfsearch nd1 nd2 
+    end2 <- liftIO $ getCurrentTime
+    let timePassed2 = diffUTCTime end2 start2  
+    --liftIO $ print timePassed
+    liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
+    return ()
+
+
+
 
 
 makeDynamicOperation :: String -> AccessMode -> IO()
@@ -308,7 +362,7 @@ makeDynamicOperation test_db readwritemode = do
     putStrLn (" Enter the second node : ")
     secondChar <- getLine
     db <- openDB test_db  
-    (a,b) <- runDaison db readwritemode $ do 
+    runDaison db readwritemode $ do 
       nd1 <- getNdIndex (I (read firstChar :: Int64))
       nd2 <- getNdIndex (I (read secondChar :: Int64))
       start1 <- liftIO $ getCurrentTime
@@ -319,17 +373,23 @@ makeDynamicOperation test_db readwritemode = do
       liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
 
       start <- liftIO $ getCurrentTime
-      flag <- dfsearch nd1 nd2
+      (flag, count) <- df_search nd1 nd2 0
       end <- liftIO $ getCurrentTime
       let timePassed = diffUTCTime end start  
       --liftIO $ print timePassed
-      liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
+      liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
+
+      start2 <- liftIO $ getCurrentTime
+      (flag2) <- dfsearch nd1 nd2 
+      end2 <- liftIO $ getCurrentTime
+      let timePassed2 = diffUTCTime end2 start2  
+      --liftIO $ print timePassed
+      liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
 
 
-
-      x <- select [ x | x <- from graph1Table everything ] 
-      y <- select [ x | x <- from nodeMapTable everything ]
-      return (x,y)
+{-       x <- select [ x | x <- from graph1Table everything ] 
+      y <- select [ x | x <- from nodeMapTable everything ] -}
+      return ()
     putStrLn "make dynamic" 
 --    mapM_ (\y -> putStrLn (show y) ) a
 --    mapM_ (\y -> putStrLn (show y) ) b
@@ -376,6 +436,27 @@ dfsearch nd1 nd2 = do
       True -> return True
       False -> or <$> (mapM (\x -> dfsearch x nd2) lis)
     [] -> return False
+
+
+df_search :: Nd -> Nd ->Int64-> Daison (Bool, Int64)
+df_search nd1 nd2 count = do 
+  record <- select [edgs | (X n edgs) <- from nodeMapTable (at nd1)  ] 
+{-   liftIO $ print $ " countMaam : " ++ show (count) ++ " X : " ++ show nd1 -}
+{-   liftIO  $ print  $ " from liftio graph " ++ show record ++ " for node : " ++ show nd1 -}
+  case (head record) of
+    lis@(first : rest) -> case (List.elem nd2 lis) of
+      True -> return (True, count)
+      False -> do (b',i') <-foldM (\(b, i) x -> do 
+                                     (b',i') <- df_search x nd2 (i+1)
+                                    
+                                     return (b'||b , i'))
+                                  (False, (count))
+                                  lis
+{-                   liftIO $ print $ " count : " ++ show i' ++ " X : " ++ show nd1  -}
+                  return (b',i')
+    [] ->  return (False,count)
+
+
 
 
 

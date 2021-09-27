@@ -55,6 +55,8 @@ main = do
   inp_1 <- getLine
   putStrLn (" Enter the maximum number of tree edges a node can have : ")
   inp_2 <- getLine
+  putStrLn (" Enter the maximum number of non-tree edges a node can have : ")
+  inp_3 <- getLine
   putStrLn ("a for AILabel")
   putStrLn ("d for DAILabel")
   putStrLn ("m for DAILabelModified")
@@ -63,8 +65,9 @@ main = do
   process_char <- getChar
   let n = (read inp_1 :: Int64)
   let d = (read inp_2 :: Int64)
+  let p = (read inp_3 :: Int64)
   case process_char of
-    'a' -> AILabel.main1 n d
+    'a' -> AILabel.main1 n d p
     'd' -> DAILabel.main1 n d
     'm' -> DAILabelModified.main1 n d
     _   -> putStrLn("Try again ") >> main
