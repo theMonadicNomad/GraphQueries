@@ -239,7 +239,7 @@ main1 n d p = do
                 | otherwise = Map.fromList g1
   print $ show graphmap1
   removeFile databaseTest
-
+ 
   db <- openDB databaseTest
   (x,y,z) <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
@@ -248,11 +248,11 @@ main1 n d p = do
     process graphmap1
     end <- liftIO $ getCurrentTime
     let timePassed = diffUTCTime end start  
-    liftIO $ print timePassed
+    liftIO $ print timePassed 
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
     makeDynamic n
-    return (x,y,timePassed)
+    return (x,y, timePassed)
 
   putStrLn "-------------------"
   mapM_ print x
@@ -307,14 +307,18 @@ makeDynamic p = do
   let n = read firstChar :: Int64
   foldM_ (\_ m -> do 
                       (x,y) <- liftIO $ getRandomNodes p
-                      resx <- select (from nodemap_index (at x))
-                      resy <- select (from nodemap_index (at y))
-                      processSearching (head resx) (head resy)
-                      return ()                    
+                      when(x/=y) $ do 
+                        resx <- select (from nodemap_index (at x))
+                        resy <- select (from nodemap_index (at y))
+                        processSearching (head resx) (head resy)
+                        return ()                    
                    )
                    ()
                    [1..n]
-  makeDynamic p
+  liftIO $ print $ "Enter 'q' to quit: "
+  qChar <- liftIO $ getChar
+  if(qChar == 'q') then return ()
+    else makeDynamic p
 
 getRandomNodes :: Int64 -> IO(Node,Node)
 getRandomNodes n = do 
@@ -327,25 +331,25 @@ processSearching nd1  nd2 = do
     liftIO $ print  $ " nd1:  " ++ show nd1 ++ " nd2: " ++ show nd2
 
     start1 <- liftIO $ getCurrentTime
-    flag1 <- search nd1 nd2
+    flag1 <- search nd1 nd2 1
     end1 <- liftIO $ getCurrentTime
     let timePassed1 = diffUTCTime end1 start1  
-    --liftIO $ print timePassed
-    liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+--    liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
 
     start <- liftIO $ getCurrentTime
     (flag, count) <- df_search nd1 nd2 0
     end <- liftIO $ getCurrentTime
     let timePassed = diffUTCTime end start  
-    --liftIO $ print timePassed
-    liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
+--    liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
 
     start2 <- liftIO $ getCurrentTime
     (flag2) <- dfsearch nd1 nd2 
     end2 <- liftIO $ getCurrentTime
     let timePassed2 = diffUTCTime end2 start2  
-    --liftIO $ print timePassed
-    liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
+    when (flag1/=flag2) $ do
+      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+      liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
+
     return ()
 
 
@@ -357,16 +361,25 @@ makeDynamicOperation test_db readwritemode = do
     IO.hSetBuffering IO.stdin IO.NoBuffering
 {-     putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion : ")
     choice <- getChar -}
+    putStrLn (" Enter the graph type (I) for Integer, (C) for Character : ")
+    gType <- getChar
     putStrLn (" Enter the first node to search : ")
     firstChar <- getLine
     putStrLn (" Enter the second node : ")
     secondChar <- getLine
     db <- openDB test_db  
     runDaison db readwritemode $ do 
-      nd1 <- getNdIndex (I (read firstChar :: Int64))
-      nd2 <- getNdIndex (I (read secondChar :: Int64))
+      (nd1,nd2) <- if (gType == 'I') then 
+        do 
+          nd1 <- getNdIndex (I (read firstChar :: Int64))
+          nd2 <- getNdIndex (I (read secondChar :: Int64))
+          return (nd1,nd2)
+        else do
+          nd1 <- getNdIndex (C (head firstChar))
+          nd2 <- getNdIndex (C (head secondChar :: Char))
+          return (nd1,nd2)
       start1 <- liftIO $ getCurrentTime
-      flag1 <- search nd1 nd2
+      flag1 <- search nd1 nd2 1
       end1 <- liftIO $ getCurrentTime
       let timePassed1 = diffUTCTime end1 start1  
       --liftIO $ print timePassed
@@ -400,10 +413,11 @@ makeDynamicOperation test_db readwritemode = do
 
 
 
-queryM :: Nd -> Nd -> Daison Bool
-queryM nd1 nd2 = do
+step1 :: Nd -> Nd -> Daison Bool
+step1 nd1 nd2 = do
   label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
   label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+--  liftIO  $ print  $ " from QUERY " ++ show nd1 ++ " :  " ++ show nd2
   case label1 of 
     [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
       case label2 of
@@ -413,19 +427,40 @@ queryM nd1 nd2 = do
     _ -> error "error again "
 
 
-search :: Nd -> Nd -> Daison Bool
-search nd1 nd2 = do
+search :: Nd -> Nd ->Int -> Daison Bool
+search nd1 nd2 step = do
+  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
+  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+--  liftIO  $ print  $ " from SEARCH " ++ show nd1 ++ " :  " ++ show nd2
+  case label1 of 
+    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
+      if (step ==1) then do
+        flag <- step1 nd1 nd2
+        if flag then return True
+          else do
+            x <- or <$> (mapM (\x -> search x nd2 1) (Set.toList hp1)) 
+            if x then return True
+            else do
+              or <$> (mapM (\x -> search  x nd2 2) ( filter (/=nd1) (Set.toList dir1)) )
+        else do
+          x <- or <$> (mapM (\x -> search x nd2 1) (Set.toList hp1)) 
+          if x then return True
+            else do
+              or <$> (mapM (\x -> search  x nd2 2) ( filter (/=nd1)(Set.toList dir1)) )
+
+        
+{- step2 :: Nd ->Nd -> ->Daison Bool
+step2 nd1  nd2  = do
   label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
   label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
   case label1 of 
     [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
-      flag <- queryM nd1 nd2
+      flag <- step1 nd1 nd2 
       if flag then return True
-      else do
-        x <- or <$> (mapM (\x -> search x nd2) (Set.toList hp1)) 
-        if not x 
-          then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
-        else return x
+      else do 
+        x <- or <$> (mapM (\x -> step1 x nd2) (Set.toList hp1)) 
+ -}
+
 
 dfsearch :: Nd -> Nd -> Daison Bool
 dfsearch nd1 nd2 = do 
