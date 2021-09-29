@@ -350,12 +350,12 @@ processSearching nd1  nd2 = do
       let timePassed = diffUTCTime end start  
 
       start2 <- liftIO $ getCurrentTime
-      (flag2, _) <- df_search1 [nd1] nd2 0 
+      (flag2, count2) <- df_search1 [nd1] nd2 0 
       end2 <- liftIO $ getCurrentTime
       let timePassed2 = diffUTCTime end2 start2  
-      if(flag11 && flag1 && flag && flag2 ) then return ()
-        else do 
-{-     when (flag /= flag2) $ do  -}
+{-       if(flag11 && flag1 && flag && flag2 ) then return ()
+        else do  -}
+      when (1 == 1) $ do  
           liftIO $ print  $ " nd1:  " ++ show nd1 ++ " nd2: " ++ show nd2
 
           liftIO $ print  $ " Result : " ++ show flag11 ++ " Time Taken for  AILabel1 Optimized Search1 : "++show timePassed11
@@ -366,7 +366,7 @@ processSearching nd1  nd2 = do
           liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
       
 
-          liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
+          liftIO $ print  $ " Result : " ++ show flag2  ++ " Nodes: " ++ show count2 ++" Time Taken for Depth First Search : "++show timePassed2
           return ()
 {-     when (flag1/=flag2) $ do
       liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
