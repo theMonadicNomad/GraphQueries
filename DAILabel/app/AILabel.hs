@@ -252,7 +252,7 @@ main1 n d p = do
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
     makeDynamic n
-    return (x,y, timePassed)
+    return (x,y,1 {- timePassed -})
 
   putStrLn "-------------------"
   mapM_ print x
@@ -324,38 +324,50 @@ getRandomNodes :: Int64 -> IO(Node,Node)
 getRandomNodes n = do 
       gen <- newStdGen
       let a:b:_ = take 2 (randomRs (1,n) gen) 
-      if (a<b) then return (I a,I b) else return (I b,I a)
+      return (I a, I b)
+--      if (a<b) then return (I a,I b) else return (I b,I a)
 
 processSearching :: Nd ->Nd-> Daison()
 processSearching nd1  nd2 = do 
-    liftIO $ print  $ " nd1:  " ++ show nd1 ++ " nd2: " ++ show nd2
 
-    start1 <- liftIO $ getCurrentTime
-    flag1 <- search nd1 nd2 1
-    end1 <- liftIO $ getCurrentTime
-    let timePassed1 = diffUTCTime end1 start1  
-    liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+
 
     start11 <- liftIO $ getCurrentTime
     (flag11, _) <- search1 nd1 nd2 1 (Set.empty)
     end11 <- liftIO $ getCurrentTime
     let timePassed11 = diffUTCTime end11 start11  
-    liftIO $ print  $ " Result : " ++ show flag11 ++ " Time Taken for  AILabel1 Optimized Search1 : "++show timePassed11
 
 
+    when (flag11) $ do 
+      start1 <- liftIO $ getCurrentTime
+      flag1 <- search nd1 nd2 1
+      end1 <- liftIO $ getCurrentTime
+      let timePassed1 = diffUTCTime end1 start1  
 
-    start <- liftIO $ getCurrentTime
-    (flag, count) <- df_search nd1 nd2 0
-    end <- liftIO $ getCurrentTime
-    let timePassed = diffUTCTime end start  
-    liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
+      start <- liftIO $ getCurrentTime
+      (flag, count) <- df_search nd1 nd2 0
+      end <- liftIO $ getCurrentTime
+      let timePassed = diffUTCTime end start  
 
-    start2 <- liftIO $ getCurrentTime
-    (flag2) <- df_search1 [nd1] nd2 0 
-    end2 <- liftIO $ getCurrentTime
-    let timePassed2 = diffUTCTime end2 start2  
-    liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
+      start2 <- liftIO $ getCurrentTime
+      (flag2, _) <- df_search1 [nd1] nd2 0 
+      end2 <- liftIO $ getCurrentTime
+      let timePassed2 = diffUTCTime end2 start2  
+      if(flag11 && flag1 && flag && flag2 ) then return ()
+        else do 
+{-     when (flag /= flag2) $ do  -}
+          liftIO $ print  $ " nd1:  " ++ show nd1 ++ " nd2: " ++ show nd2
 
+          liftIO $ print  $ " Result : " ++ show flag11 ++ " Time Taken for  AILabel1 Optimized Search1 : "++show timePassed11
+
+          liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+
+
+          liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
+      
+
+          liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
+          return ()
 {-     when (flag1/=flag2) $ do
       liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
  -}
@@ -517,7 +529,7 @@ df_search :: Nd -> Nd ->Int64-> Daison (Bool, Int64)
 df_search nd1 nd2 count = do 
   record <- select [edgs | (X n edgs) <- from nodeMapTable (at nd1)  ] 
   (X n edges) <- query firstRow (from nodeMapTable (at nd1)) 
---  liftIO $ print $ " countMaam : " ++ show (count) ++ " nd1 : " ++ show nd1 ++ " edges :" ++show (head record) ++" nd2 : " ++ show nd2
+--  liftIO $ print $ " countMaam : " ++ show (count) ++ " nd1 : " ++ show nd1 ++ " edges :" ++show edges ++" nd2 : " ++ show nd2
 {-   liftIO  $ print  $ " from liftio graph " ++ show record ++ " for node : " ++ show nd1 -}
   case edges of
     (first : rest) -> case (List.elem nd2 edges) of
@@ -534,7 +546,7 @@ df_search nd1 nd2 count = do
 df_search1 :: [Nd] -> Nd-> Int64 -> Daison (Bool, Int64)
 df_search1 (nd1:rs) nd2 count  = do 
   (X n edges) <- query firstRow (from nodeMapTable (at nd1)) 
---  liftIO $ print $ " nd1 : " ++ show nd1 ++ " edges :" ++show (head record) ++" nd2 : " ++ show nd2
+--  liftIO $ print $ " nd1 : " ++ show nd1 ++ " edges :" ++show edges ++" nd2 : " ++ show nd2
   case edges of
     (first : rest) -> case (List.elem nd2 edges) of
       True -> return (True, count)
@@ -546,7 +558,8 @@ df_search1 (nd1:rs) nd2 count  = do
             if (c) then return (True, count'') 
               else do 
                 if (rs == []) then return (c, count'') else df_search1 rs nd2 (count''+1)
-    [] ->  return (False, count)
+    [] -> if (rs == []) then return (False, count) else df_search1 rs nd2 (count+1)
+       --return (False, count)
 
 
 
