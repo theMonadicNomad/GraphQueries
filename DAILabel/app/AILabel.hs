@@ -237,7 +237,7 @@ main1 n d p = do
   let Graph g = graph2
   let graphmap1 | n == 0 = Map.fromList g
                 | otherwise = Map.fromList g1
-  print $ show graphmap1
+  when (n<50) $ print $ show graphmap1
   removeFile databaseTest
  
   db <- openDB databaseTest
@@ -248,7 +248,7 @@ main1 n d p = do
     process graphmap1
     end <- liftIO $ getCurrentTime
     let timePassed = diffUTCTime end start  
-    liftIO $ print timePassed 
+    liftIO $ print $ " AILabel Index creation time:" ++  show timePassed 
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
     makeDynamic n
@@ -334,22 +334,31 @@ processSearching nd1  nd2 = do
     flag1 <- search nd1 nd2 1
     end1 <- liftIO $ getCurrentTime
     let timePassed1 = diffUTCTime end1 start1  
---    liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+    liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+
+    start11 <- liftIO $ getCurrentTime
+    (flag11, _) <- search1 nd1 nd2 1 (Set.empty)
+    end11 <- liftIO $ getCurrentTime
+    let timePassed11 = diffUTCTime end11 start11  
+    liftIO $ print  $ " Result : " ++ show flag11 ++ " Time Taken for  AILabel1 Optimized Search1 : "++show timePassed11
+
+
 
     start <- liftIO $ getCurrentTime
     (flag, count) <- df_search nd1 nd2 0
     end <- liftIO $ getCurrentTime
     let timePassed = diffUTCTime end start  
---    liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
+    liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
 
     start2 <- liftIO $ getCurrentTime
-    (flag2) <- dfsearch nd1 nd2 
+    (flag2) <- df_search1 [nd1] nd2 0 
     end2 <- liftIO $ getCurrentTime
     let timePassed2 = diffUTCTime end2 start2  
-    when (flag1/=flag2) $ do
-      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
-      liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
+    liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
 
+{-     when (flag1/=flag2) $ do
+      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+ -}
     return ()
 
 
@@ -393,7 +402,7 @@ makeDynamicOperation test_db readwritemode = do
       liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
 
       start2 <- liftIO $ getCurrentTime
-      (flag2) <- dfsearch nd1 nd2 
+      (flag2) <- df_search1 [nd1] nd2  0
       end2 <- liftIO $ getCurrentTime
       let timePassed2 = diffUTCTime end2 start2  
       --liftIO $ print timePassed
@@ -413,15 +422,14 @@ makeDynamicOperation test_db readwritemode = do
 
 
 
-step1 :: Nd -> Nd -> Daison Bool
-step1 nd1 nd2 = do
-  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
-  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+step1 :: Nd -> Nd ->Labels-> Daison Bool
+step1 nd1 nd2 label2 = do
+  label1 <- query firstRow (from graph1Table (at nd1)) 
 --  liftIO  $ print  $ " from QUERY " ++ show nd1 ++ " :  " ++ show nd2
   case label1 of 
-    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
+    (Labels pre1 post1 hp1 dir1) -> do
       case label2 of
-        [(Labels {- trp2 -} pre2 post2 hp2 dir2)] -> if  (pre1 < post2 && post2 <= post1) then return True
+        (Labels pre2 post2 hp2 dir2) -> if  (pre1 < post2 && post2 <= post1) then return True
                                              else return False
         _ -> error "error "                
     _ -> error "error again "
@@ -429,13 +437,13 @@ step1 nd1 nd2 = do
 
 search :: Nd -> Nd ->Int -> Daison Bool
 search nd1 nd2 step = do
-  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
-  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+  label1 <- query firstRow (from graph1Table (at nd1)) 
+  label2 <- query firstRow (from graph1Table (at nd2)) 
 --  liftIO  $ print  $ " from SEARCH " ++ show nd1 ++ " :  " ++ show nd2
   case label1 of 
-    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
+    (Labels  pre1 post1 hp1 dir1) -> do
       if (step ==1) then do
-        flag <- step1 nd1 nd2
+        flag <- step1 nd1 nd2 label2
         if flag then return True
           else do
             x <- or <$> (mapM (\x -> search x nd2 1) (Set.toList hp1)) 
@@ -448,19 +456,51 @@ search nd1 nd2 step = do
             else do
               or <$> (mapM (\x -> search  x nd2 2) ( filter (/=nd1)(Set.toList dir1)) )
 
-        
-{- step2 :: Nd ->Nd -> ->Daison Bool
-step2 nd1  nd2  = do
-  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
-  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+search1 :: Nd -> Nd ->Int -> (Set (Nd,Nd)) -> Daison (Bool, Set (Nd, Nd))
+search1 nd1 nd2 step queryset = do
+  let newset = (Set.insert (nd1,nd2) queryset)
+  label1 <- query firstRow (from graph1Table (at nd1)) 
+  label2 <- query firstRow (from graph1Table (at nd2)) 
+--  liftIO  $ print  $ " from SEARCH " ++ show nd1 ++ " :  " ++ show nd2
   case label1 of 
-    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
-      flag <- step1 nd1 nd2 
-      if flag then return True
-      else do 
-        x <- or <$> (mapM (\x -> step1 x nd2) (Set.toList hp1)) 
- -}
-
+    (Labels pre1 post1 hp1 dir1) -> do
+      if (step ==1) then do
+        flag <- step1 nd1 nd2 label2
+        if flag then return (True, newset)
+          else do
+            (x,s'') <- foldM (\(b,s ) x -> do 
+                            if (Set.member (x,nd2) s ) then return (b,s)
+                              else do 
+                                (b',s') <- search1 x nd2 1 s                                   
+                                return (b'||b ,s'))
+                        (False, newset)
+                        (Set.toList hp1) 
+            if x then return (True,s'')
+            else do
+                foldM (\(b,s) x -> do
+                          if (Set.member (x,nd2) s ) then return (b,s)
+                            else do 
+                              (b',s') <- search1 x nd2 2 s                                  
+                              return (b'||b, s' ))
+                      (False, s'')
+                      ( filter (/=nd1)(Set.toList dir1)) 
+        else do
+          (x,s'') <- foldM (\(b,s) x -> do 
+                                     if (Set.member (x, nd2) s) then return (b,s)
+                                        else do 
+                                          (b',s') <- search1 x nd2 1 s                                 
+                                          return (b'||b,s' ))
+                                  (False, newset)
+                                  (Set.toList hp1) 
+          if x then return (True,s'')
+            else do
+              foldM (\(b,s) x -> do 
+                                    if (Set.member (x, nd2) s ) then return (b,s)
+                                      else do 
+                                        (b',s') <- search1 x nd2 2 s                               
+                                        return (b'||b,s' ))
+                                  (False,s'')
+                                  ( filter (/=nd1)(Set.toList dir1)) 
 
 dfsearch :: Nd -> Nd -> Daison Bool
 dfsearch nd1 nd2 = do 
@@ -476,22 +516,37 @@ dfsearch nd1 nd2 = do
 df_search :: Nd -> Nd ->Int64-> Daison (Bool, Int64)
 df_search nd1 nd2 count = do 
   record <- select [edgs | (X n edgs) <- from nodeMapTable (at nd1)  ] 
-{-   liftIO $ print $ " countMaam : " ++ show (count) ++ " X : " ++ show nd1 -}
+  (X n edges) <- query firstRow (from nodeMapTable (at nd1)) 
+--  liftIO $ print $ " countMaam : " ++ show (count) ++ " nd1 : " ++ show nd1 ++ " edges :" ++show (head record) ++" nd2 : " ++ show nd2
 {-   liftIO  $ print  $ " from liftio graph " ++ show record ++ " for node : " ++ show nd1 -}
-  case (head record) of
-    lis@(first : rest) -> case (List.elem nd2 lis) of
+  case edges of
+    (first : rest) -> case (List.elem nd2 edges) of
       True -> return (True, count)
       False -> do (b',i') <-foldM (\(b, i) x -> do 
                                      (b',i') <- df_search x nd2 (i+1)
-                                    
                                      return (b'||b , i'))
                                   (False, (count))
-                                  lis
-{-                   liftIO $ print $ " count : " ++ show i' ++ " X : " ++ show nd1  -}
+                                  edges
                   return (b',i')
     [] ->  return (False,count)
 
 
+df_search1 :: [Nd] -> Nd-> Int64 -> Daison (Bool, Int64)
+df_search1 (nd1:rs) nd2 count  = do 
+  (X n edges) <- query firstRow (from nodeMapTable (at nd1)) 
+--  liftIO $ print $ " nd1 : " ++ show nd1 ++ " edges :" ++show (head record) ++" nd2 : " ++ show nd2
+  case edges of
+    (first : rest) -> case (List.elem nd2 edges) of
+      True -> return (True, count)
+      False -> do
+        (b, count') <- df_search1 [first] nd2 (count +1)
+        if(b) then return (True, count') 
+          else do
+            (c, count'') <- if (rest == []) then return (b, count') else df_search1 rest nd2 (count'+1)
+            if (c) then return (True, count'') 
+              else do 
+                if (rs == []) then return (c, count'') else df_search1 rs nd2 (count''+1)
+    [] ->  return (False, count)
 
 
 
