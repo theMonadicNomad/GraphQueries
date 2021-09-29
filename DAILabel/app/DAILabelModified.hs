@@ -197,13 +197,8 @@ graph5 = Graph
       ( C 'n', [  ] ),
       ( C 'o', [ C 'p' , C 'q' ] ),
       ( C 'p', [  ] ),
-      ( C 'q', [  ] )
-
-
-      
+      ( C 'q', [  ] ) 
     ]
-
-
 
 graph6 :: Graph Node
 graph6 = Graph
@@ -305,65 +300,6 @@ ranValues gen n a b = do
   putStrLn $ show newGen
   return (values, newGen)
 
-
-
-main :: IO ()
-main = do
-  IO.hSetBuffering IO.stdin IO.NoBuffering
-  putStrLn ("Enter the number of nodes : ")
-  inp_1 <- getLine
-  putStrLn (" Enter the density : ")
-  inp_2 <- getLine
-  let n = (read inp_1 :: Int64)
-  let d = (read inp_2 :: Double)
-  let Graph g1 = generateGraph n d
-  print $ show g1
-  db <- openDB databaseTest
-  (a,b)  <- runDaison db ReadWriteMode $ do
-    tryCreateTable graph1Table
-    tryCreateTable nodeMapTable
-    let Graph g = graph5
-    let graphmap1 =  Map.fromList g
-    dynamicProcess graphmap1 
-    a <- select [ x | x <- from graph1Table everything ]
-    b <- select [ x | x <- from nodeMapTable everything ]
-    return (a,b)
-  putStrLn "FROM MAIN"
-  mapM_ (\y -> putStrLn (show y) ) a
-  mapM_ (\y -> putStrLn (show y) ) b
-  closeDB db
-  makeDynamicOperation databaseTest ReadWriteMode
-
-main1  :: Int64 -> Int64 -> IO ()
-main1 n d= do
-  removeFile databaseTest
-  IO.hSetBuffering IO.stdin IO.NoBuffering
-  Graph g1 <- generateTreeGraph n d
---  let Graph g1 = generateGraph n d
-
-  print $ show g1
-  db <- openDB databaseTest
-  (a,b,c)  <- runDaison db ReadWriteMode $ do
-    tryCreateTable graph1Table
-    tryCreateTable nodeMapTable
-    let Graph g = graph2
-    let graphmap1 | n == 0 = Map.fromList g
-                  | otherwise = Map.fromList g1
-    start <- liftIO $ getCurrentTime 
-    dynamicProcess graphmap1 
-    end <- liftIO $ getCurrentTime
-    let timePassed = diffUTCTime end start  
-    a <- select [ x | x <- from graph1Table everything ]
-    b <- select [ x | x <- from nodeMapTable everything ]
-    return (a,b,timePassed)
-  putStrLn "FROM dailabel modified"
-  mapM_ (\y -> putStrLn (show y) ) a
-  mapM_ (\y -> putStrLn (show y) ) b
-  print $ "Time for  DaiLabel modified for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
-  closeDB db
-  makeDynamicOperation databaseTest ReadWriteMode
-
-
 generateTreeGraph :: Int64 -> Int64 -> IO (Graph Node)
 generateTreeGraph  total n  = do
   if total == 0
@@ -410,14 +346,66 @@ generateChildren n c total =   do
   -- putStrLn $ show (values)
   return (I <$> [c .. (mod (c+ values-1) total) ] )
 
-
-
-
 generateGraph :: Int64 -> Double ->Graph Node
 generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
     where 
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
+main :: IO ()
+main = do
+  IO.hSetBuffering IO.stdin IO.NoBuffering
+  putStrLn ("Enter the number of nodes : ")
+  inp_1 <- getLine
+  putStrLn (" Enter the density : ")
+  inp_2 <- getLine
+  let n = (read inp_1 :: Int64)
+  let d = (read inp_2 :: Double)
+  let Graph g1 = generateGraph n d
+  print $ show g1
+  db <- openDB databaseTest
+  (a,b)  <- runDaison db ReadWriteMode $ do
+    tryCreateTable graph1Table
+    tryCreateTable nodeMapTable
+    let Graph g = graph5
+    let graphmap1 =  Map.fromList g
+    dynamicProcess graphmap1 
+    a <- select [ x | x <- from graph1Table everything ]
+    b <- select [ x | x <- from nodeMapTable everything ]
+    return (a,b)
+  putStrLn "FROM MAIN"
+  mapM_ (\y -> putStrLn (show y) ) a
+  mapM_ (\y -> putStrLn (show y) ) b
+  closeDB db
+  makeDynamicOperation databaseTest ReadWriteMode
+
+main1  :: Int64 -> Int64 -> IO ()
+main1 n d= do
+  removeFile databaseTest
+  IO.hSetBuffering IO.stdin IO.NoBuffering
+  Graph g1 <- generateTreeGraph n d
+--  let Graph g1 = generateGraph n d
+  when (n<50) $ print $ show g1
+  db <- openDB databaseTest
+  (a,b,c)  <- runDaison db ReadWriteMode $ do
+    tryCreateTable graph1Table
+    tryCreateTable nodeMapTable
+    let Graph g = graph2
+    let graphmap1 | n == 0 = Map.fromList g
+                  | otherwise = Map.fromList g1
+    start <- liftIO $ getCurrentTime 
+    dynamicProcess graphmap1 
+    end <- liftIO $ getCurrentTime
+    let timePassed = diffUTCTime end start  
+    a <- select [ x | x <- from graph1Table everything ]
+    b <- select [ x | x <- from nodeMapTable everything ]
+    return (a,b,timePassed)
+  putStrLn "FROM dailabel modified"
+  when (n<50) $ do
+    mapM_ (\y -> putStrLn (show y) ) a
+    mapM_ (\y -> putStrLn (show y) ) b
+  print $ "Time for  DaiLabel modified for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
+  closeDB db
+  makeDynamicOperation databaseTest ReadWriteMode
 
 getNdIndex node = do
   nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
@@ -427,51 +415,6 @@ getNdIndex node = do
       pkey <- insert_ nodeMapTable (X node [])
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
-
-
-makeDynamicOperation :: String -> AccessMode -> IO()
-makeDynamicOperation test_db readwritemode = do
-    IO.hSetBuffering IO.stdin IO.NoBuffering
-    putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion or (r) for Reset : ")
-    choice <- getChar
-    putStrLn (" Enter the first node : ")
-    firstChar <- getChar
-    putStrLn (" Enter the second node : ")
-    secondChar <- getChar
-    db <- openDB test_db  
-    (a,b) <- runDaison db readwritemode $ do 
-      nd1 <- getNdIndex (C firstChar)
-      nd2 <- getNdIndex (C secondChar)
-      case choice of
-        'i' -> handleInsert nd1 nd2
-        'd' -> handleDelete nd1 nd2 
-        's' -> do 
-          start1 <- liftIO $ getCurrentTime
-          flag1 <- fetchLabels (PreLabel nd1) >>= \label1 -> fetchLabels (PreLabel nd2) >>= \label2 -> search nd1  label1 nd2 label2
-          end1 <- liftIO $ getCurrentTime
-          let timePassed1 = diffUTCTime end1 start1  
-          --liftIO $ print timePassed
-          liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  DAILabelModified Search : "++show timePassed1
-
-          start <- liftIO $ getCurrentTime
-          flag <- dfsearch nd1 nd2
-          end <- liftIO $ getCurrentTime
-          let timePassed = diffUTCTime end start  
-          --liftIO $ print timePassed
-          liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
-
-        'r' ->  do
-          dropTable graph1Table
-          dropTable nodeMapTable
-          liftIO main
-      x <- select [ x | x <- from graph1Table everything ] 
-      y <- select [ x | x <- from nodeMapTable everything ]
-      return (x,y)
-    putStrLn "from make dynamic" 
-    mapM_ (\y -> putStrLn (show y) ) a
---    mapM_ (\y -> putStrLn (show y) ) b
-    closeDB db
-    makeDynamicOperation test_db readwritemode
 
 dynamicProcess :: GraphMap Node -> Daison ()
 dynamicProcess graphmap = do
@@ -501,20 +444,6 @@ processNodes graph graphMap node parent_node = do
                 Just rest    ->do
                   foldM (\acc x -> processNodes graph acc x node) gm rest
 
-updateLabel :: Nd ->Labels->  Daison ()
-updateLabel nd res = do
-  liftIO $ print $ " update label nd :" ++ show nd
-  prev <- prevOf (PreLabel nd) res >>= \(x,xlabels) -> getIntervalLabel x xlabels
-  case res of
-    Labels tp pr ps hp dir fc lc ns ls -> do
-      post <-  fetchLabels (PostLabel tp) >>= \tplabel -> getIntervalLabel (PostLabel tp) tplabel 
-      let pr = average prev post
-      let ps = average pr post
-      update_ graph1Table (return (nd, res{preL = pr, postL = ps}))
-      (next, nextRecord) <- nextNode nd res{preL = pr, postL = ps}
-      when (next > 0) $ updateLabel next nextRecord
-  return()
- 
 handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
@@ -623,7 +552,10 @@ handleInsert nd1 nd2 = do
     (X pnd edges) ->  store nodeMapTable (Just nd1) (X pnd (nd2:edges))
   return()
 --  store nodeMapTable (Just parent) (X pnd (List.nub (nd:edges)))
-  where     
+  where
+    addHop nd1 (Labels tp pr ps hp dir fc lc ns ls) nd2 = when (nd1 > 0) $ do
+      store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir fc lc ns ls)
+      return ()     
     insert2IsolatedNodes nd1 nd2 = do 
       res <- query firstRow (from graph1Table (at 0))
       case res of 
@@ -659,8 +591,23 @@ handleInsert nd1 nd2 = do
                 store graph1Table (Just 0) record{ lastChild =nd1}
                 return (pre1,pre2,post1,post2,rlc )
 
+updateDirectInAncestors :: Nd -> Labels -> (Directs -> Directs) -> Daison ()
+updateDirectInAncestors nd (Labels tp pr ps hp dir fc lc ns ls) f = do
+  store graph1Table (Just nd) (Labels tp pr ps hp (f dir) fc lc ns ls)
+  when (tp /= 0) $ do
+    record <- query firstRow (from graph1Table (at tp))
+    updateDirectInAncestors tp record f
 
 average x y = x + div (y-x) 2
+
+fetchLabels (PreLabel nd) = query firstRow (from graph1Table (at nd))
+fetchLabels (PostLabel nd) = query firstRow (from graph1Table (at nd))
+
+getIntervalLabel :: PrePostRef -> Labels-> Daison Nd
+getIntervalLabel ppr (Labels trp pr ps hp dir fc lc ns ls ) = 
+  case ppr of
+    (PreLabel nd) -> return pr
+    (PostLabel nd) -> return ps
 
 verifyAndInsertChild nd1 record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _) nd2 record2@(Labels tp2 _ _ _ _ _ _ _ _ ) = do 
       if(lc1 < 0) then do 
@@ -727,87 +674,101 @@ handleDelete nd1 nd2 = do
               _ -> error $ "invalid from handle delete : " ++ show nd1 ++ show nd2
           deleteHopsFrom nd1 (head res1) nd2 --verify 
           return ()
+  where
+    deleteEdge nd1 nd2 = do 
+      (X n edgs) <- query firstRow (from nodeMapTable (at nd1))
+      store nodeMapTable (Just nd1) ( X n (List.delete nd2 edgs))
+      return()
+    deleteDirectsandAncestors nd1 record1 nd2 = do
+      case record1 of
+        Labels tp pr ps hp dir fc lc ns ls -> do
+          update_ graph1Table (return (nd1, Labels tp pr ps hp (Set.delete nd2 dir) fc lc ns ls ) )
+          when (tp/=0) $ do
+            record <- query firstRow (from graph1Table (at tp))
+            deleteDirectsandAncestors tp record nd2
+        _ -> error $ "invalid from deletedirectss and ancestors " ++ show nd1 ++ show nd2
+    isTreeEdge nd1 record nd2 = do
+      case record of 
+        (Labels tp pr ps hp dir fc lc ns ls) -> case (List.elem nd2 hp) of
+          True -> return False
+          False -> do 
+            nodemap_record <- select [edgs | ( X n edgs) <- from nodeMapTable (at nd1)  ]
+            let nd_edges = head nodemap_record
+            return (List.elem nd2 nd_edges) 
+        _ -> error $ " from istreeedge : " ++ show nd1 ++ show nd2
+    isTheOnlyNonTreeEdge nd1 record1 nd2 = do
+        case record1 of
+          Labels trp pr ps hp dir fc lc ns ls ->  do 
+            if (Set.member nd2 hp) && (Set.size hp ==1) then 
+              return True
+            else if (Set.member nd2 hp) && (Set.size hp > 1) then
+              return False
+            else 
+              error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
+          _ -> error " couldnt find record from isonlynontreeedge "
+    deleteHopsFrom nd1 record1 nd2 = do
+      case record1 of
+        Labels tp pr ps hp dir fc lc ns ls -> do
+          update_ graph1Table (return (nd1, Labels tp pr ps (Set.delete nd2 hp) dir fc lc ns ls) )
+        _ -> error "invalid"  
+    removeTreeParent nd1 record1@(Labels tp1 pr1 ps1 hp1 dir1 fc1 lc1 ns1 ls1) nd2 record2@(Labels tp2 pr2 ps2 hp2 dir2 fc2 lc2 ns2 ls2) = do 
+      when (ls2 >0) $ do
+        ls2Record <- query firstRow (from graph1Table (at ls2))
+        store graph1Table (Just ls2) ls2Record{ nextSibling = ns2}
+        return ()
+      when (ns2 >0) $ do
+        ns2Record <- query firstRow (from graph1Table (at ns2))
+        store graph1Table (Just ns2) ns2Record{ lastSibling = ls2}
+        return ()
+      store graph1Table (Just nd1) record1{ firstChild = if fc1 == nd2 then ns2 else fc1,
+                                            lastChild = if lc1 == nd2 then ns2 else lc1
+                                          }
+      rootRecord <- query firstRow (from graph1Table (at 0))
+      (updatedRootRecord, updatedRecord2) <- verifyAndInsertChild 0 rootRecord nd2 record2{tree_parent = 0, nextSibling = -1}
+      store graph1Table (Just 0) updatedRootRecord
+      store graph1Table (Just nd2) updatedRecord2
+      when (fc2 >0) $ do
+        fc2Record <- query firstRow (from graph1Table (at fc2))
+        updateLabel fc2 fc2Record
+      return()
 
-isTreeEdge :: Nd -> Labels-> Nd -> Daison Bool
-isTreeEdge nd1 record nd2 = do
-  case record of 
-    (Labels tp pr ps hp dir fc lc ns ls) -> case (List.elem nd2 hp) of
-      True -> return False
-      False -> do 
-        nodemap_record <- select [edgs | ( X n edgs) <- from nodeMapTable (at nd1)  ]
-        let nd_edges = head nodemap_record
-        if (List.elem nd2 nd_edges) then 
-          return True
-        else 
-          return False
-    _ -> error $ " from istreeedge : " ++ show nd1 ++ show nd2
- 
-
-isTheOnlyNonTreeEdge :: Nd -> Labels-> Nd -> Daison Bool
-isTheOnlyNonTreeEdge nd1 record1 nd2 = do
-    case record1 of
-      Labels trp pr ps hp dir fc lc ns ls ->  do 
-        if (Set.member nd2 hp) && (Set.size hp ==1) then 
-          return True
-        else if (Set.member nd2 hp) && (Set.size hp > 1) then
-          return False
-        else 
-          error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
-      _ -> error " couldnt find record from isonlynontreeedge "
-
-deleteDirectsandAncestors :: Nd ->  Labels-> Nd -> Daison()
-deleteDirectsandAncestors nd1 record1 nd2 = do
-  case record1 of
+updateLabel :: Nd ->Labels->  Daison ()
+updateLabel nd res = do
+  liftIO $ print $ " update label nd :" ++ show nd
+  prev <- prevOf (PreLabel nd) res >>= \(x,xlabels) -> getIntervalLabel x xlabels
+  case res of
     Labels tp pr ps hp dir fc lc ns ls -> do
-      update_ graph1Table (return (nd1, Labels tp pr ps hp (Set.delete nd2 dir) fc lc ns ls ) )
-      when (tp/=0) $ do
-        record <- query firstRow (from graph1Table (at tp))
-        deleteDirectsandAncestors tp record nd2
-    _ -> error $ "invalid from deletedirectss and ancestors " ++ show nd1 ++ show nd2
-
-deleteHopsFrom :: Nd -> Labels -> Nd -> Daison ()
-deleteHopsFrom nd1 record1 nd2 = do
-  case record1 of
-    Labels tp pr ps hp dir fc lc ns ls -> do
-      update_ graph1Table (return (nd1, Labels tp pr ps (Set.delete nd2 hp) dir fc lc ns ls) )
-    _ -> error "invalid"  
-
-
-addHop :: Nd -> Labels -> Nd -> Daison ()
-addHop nd1 (Labels tp pr ps hp dir fc lc ns ls) nd2 = when (nd1 > 0) $ do
-  store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir fc lc ns ls)
-  return ()
-
-deleteEdge :: Nd -> Nd -> Daison ()
-deleteEdge nd1 nd2 = do 
-  record <- select [(n, edgs) | (X n edgs) <- from nodeMapTable (at nd1)  ] 
-  case record of
-        [(n , edgs)] -> update_ nodeMapTable (return (nd1, X n (List.delete nd2 edgs)) )
-        _            -> error $ show nd1 ++ " -  " ++ show nd2 ++ " is not an edge"
-
-
-removeTreeParent :: Nd -> Labels-> Nd -> Labels-> Daison ()
-removeTreeParent nd1 record1@(Labels tp1 pr1 ps1 hp1 dir1 fc1 lc1 ns1 ls1) nd2 record2@(Labels tp2 pr2 ps2 hp2 dir2 fc2 lc2 ns2 ls2) = do 
-  when (ls2 >0) $ do
-    ls2Record <- query firstRow (from graph1Table (at ls2))
-    store graph1Table (Just ls2) ls2Record{ nextSibling = ns2}
-    return ()
-  when (ns2 >0) $ do
-    ns2Record <- query firstRow (from graph1Table (at ns2))
-    store graph1Table (Just ns2) ns2Record{ lastSibling = ls2}
-    return ()
-  store graph1Table (Just nd1) record1{ firstChild = if fc1 == nd2 then ns2 else fc1,
-                                        lastChild = if lc1 == nd2 then ns2 else lc1
-                                      }
-  rootRecord <- query firstRow (from graph1Table (at 0))
-  (updatedRootRecord, updatedRecord2) <- verifyAndInsertChild 0 rootRecord nd2 record2{tree_parent = 0, nextSibling = -1}
-  store graph1Table (Just 0) updatedRootRecord
-  store graph1Table (Just nd2) updatedRecord2
-  when (fc2 >0) $ do
-    fc2Record <- query firstRow (from graph1Table (at fc2))
-    updateLabel fc2 fc2Record
+      post <-  fetchLabels (PostLabel tp) >>= \tplabel -> getIntervalLabel (PostLabel tp) tplabel 
+      let pr = average prev post
+      let ps = average pr post
+      update_ graph1Table (return (nd, res{preL = pr, postL = ps}))
+      (next, nextRecord) <- nextNode nd res{preL = pr, postL = ps}
+      when (next > 0) $ updateLabel next nextRecord
   return()
-    
+
+-- for updateLabels we need to find the next 'pre' nodes because 'post' nodes are already updated.
+{- nextNode :: Nd -> Daison Nd
+nextNode nd = do
+  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
+  case record of 
+   [(Labels trp pr ps hp dir fc lc ns ls)] -> if fc >0 then return fc
+      else if ns > 0 then return ns
+      else nextPre trp
+
+ -}
+nextNode :: Nd -> Labels-> Daison (Nd,Labels)
+nextNode nd record = do 
+  (a, arecord) <- nextOf (PreLabel nd) record
+  case a of 
+    (PreLabel n) -> return (n, arecord) 
+    (PostLabel n) -> nextPre (PostLabel n) arecord
+
+nextPre :: PrePostRef -> Labels -> Daison (Nd, Labels)
+nextPre (PreLabel n) record = return (n, record) 
+nextPre (PostLabel n) record = if n <=0 then return (0, record) 
+  else do
+    (b,bRecord) <- nextOf (PostLabel n) record
+    nextPre b bRecord
 
 reLabelMain :: PrePostRef -> Labels -> Daison ()
 reLabelMain v record  =  do 
@@ -816,6 +777,28 @@ reLabelMain v record  =  do
   (newd, newcount, begin,beginRecord, newv, newvRecord,  end, endRecord) <- mainLoop d count v record v record v record 
   reLabelRange begin beginRecord newv newvRecord end newd newcount  
   return ()
+
+reLabelRange :: PrePostRef -> Labels-> PrePostRef ->Labels-> PrePostRef -> Int64 ->Int64 -> Daison()
+reLabelRange begin beginRecord v vRecord end d count = do 
+  let n = div d count
+  vlabel <- getIntervalLabel v vRecord
+  let newv = vlabel  Bits..&. (Bits.complement d )
+  reLabelNodes begin beginRecord newv end n 1
+  return ()
+
+reLabelNodes begin beginRecord v end n i = do 
+    let newlabel = v + i * n
+    case begin of 
+      (PreLabel nd) -> do 
+        store graph1Table (Just nd) beginRecord{ preL = newlabel}
+        return ()
+      (PostLabel nd) -> do 
+        store graph1Table (Just nd) beginRecord{ postL = newlabel}
+        return ()
+    if begin == end then return()
+      else do
+        (newbegin,newbeginRecord) <- nextOf (begin) beginRecord
+        reLabelNodes newbegin newbeginRecord v end n (i +1)
 
 mainLoop :: Int64 -> Int64-> PrePostRef->Labels-> PrePostRef-> Labels-> PrePostRef -> Labels-> Daison (Nd, Int64, PrePostRef, Labels, PrePostRef,Labels,  PrePostRef, Labels)
 mainLoop d count begin beginRecord v vRecord end endRecord = do
@@ -841,58 +824,6 @@ goPrev begin beginRecord v vRecord count  d = do
     goPrev newbegin newbeginRecord v vRecord (count +1) d
   else return (begin, beginRecord,v,vRecord, count, d)
 
-
-goNext :: PrePostRef -> Labels->PrePostRef-> Labels -> Int64 ->  Int64 -> Daison (PrePostRef, Labels, PrePostRef, Labels,Int64,  Int64)
-goNext end endRecord v vRecord count d = do 
-  vlabel <- getIntervalLabel v vRecord
-  (newend, newendRecord) <- nextOf end endRecord
-  newendLabel <- getIntervalLabel newend newendRecord
-  if (newendLabel < (vlabel Bits..|. d)) then 
-    goNext newend newendRecord v vRecord (count +1)  d
-  else return (end, endRecord,v, vRecord, count, d)
-
-reLabelRange :: PrePostRef -> Labels-> PrePostRef ->Labels-> PrePostRef -> Int64 ->Int64 -> Daison()
-reLabelRange begin beginRecord v vRecord end d count = do 
-  let n = div d count
-  vlabel <- getIntervalLabel v vRecord
-  let newv = vlabel  Bits..&. (Bits.complement d )
-  reLabelNodes begin beginRecord newv end n 1
-  return ()
-
-reLabelNodes begin beginRecord v end n i = do 
-    let newlabel = v + i * n
-    case begin of 
-      (PreLabel nd) -> do 
-        store graph1Table (Just nd) beginRecord{ preL = newlabel}
-        return ()
-      (PostLabel nd) -> do 
-        store graph1Table (Just nd) beginRecord{ postL = newlabel}
-        return ()
-    if begin == end then return()
-      else do
-        (newbegin,newbeginRecord) <- nextOf (begin) beginRecord
-        reLabelNodes newbegin newbeginRecord v end n (i +1)
-
-fetchLabels (PreLabel nd) = query firstRow (from graph1Table (at nd))
-fetchLabels (PostLabel nd) = query firstRow (from graph1Table (at nd))
-
-getIntervalLabel :: PrePostRef -> Labels-> Daison Nd
-getIntervalLabel ppr (Labels trp pr ps hp dir fc lc ns ls ) = 
-  case ppr of
-    (PreLabel nd) -> return pr
-    (PostLabel nd) -> return ps
-
-
-{- nextNode :: Nd -> Daison Nd
-nextNode nd = do
-  record <- select [label1 | (label1) <- from graph1Table (at nd)  ] 
-  case record of 
-   [(Labels trp pr ps hp dir fc lc ns ls)] -> if fc >0 then return fc
-      else if ns > 0 then return ns
-      else nextPre trp
-
- -}
-
 prevOf :: PrePostRef -> Labels-> Daison (PrePostRef, Labels) 
 prevOf ppr record@(Labels trp pr ps hp dir fc lc ns ls ) = do 
   case ppr of
@@ -906,6 +837,15 @@ prevOf ppr record@(Labels trp pr ps hp dir fc lc ns ls ) = do
       lcLabels <- fetchLabels (PostLabel lc)
       return ((PostLabel lc), lcLabels)  
       else return ((PreLabel nd), record)
+
+goNext :: PrePostRef -> Labels->PrePostRef-> Labels -> Int64 ->  Int64 -> Daison (PrePostRef, Labels, PrePostRef, Labels,Int64,  Int64)
+goNext end endRecord v vRecord count d = do 
+  vlabel <- getIntervalLabel v vRecord
+  (newend, newendRecord) <- nextOf end endRecord
+  newendLabel <- getIntervalLabel newend newendRecord
+  if (newendLabel < (vlabel Bits..|. d)) then 
+    goNext newend newendRecord v vRecord (count +1)  d
+  else return (end, endRecord,v, vRecord, count, d)
 
 nextOf :: PrePostRef ->Labels -> Daison (PrePostRef, Labels) 
 nextOf ppr record@(Labels trp pr ps hp dir fc lc ns ls ) = do 
@@ -921,29 +861,49 @@ nextOf ppr record@(Labels trp pr ps hp dir fc lc ns ls ) = do
         trpLabels <- fetchLabels (PostLabel trp)
         return ((PostLabel trp) , trpLabels)
 
--- for updateLabels we need to find the next 'pre' nodes because 'post' nodes are already updated.
+makeDynamicOperation :: String -> AccessMode -> IO()
+makeDynamicOperation test_db readwritemode = do
+    IO.hSetBuffering IO.stdin IO.NoBuffering
+    putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion or (r) for Reset : ")
+    choice <- getChar
+    putStrLn (" Enter the first node : ")
+    firstChar <- getChar
+    putStrLn (" Enter the second node : ")
+    secondChar <- getChar
+    db <- openDB test_db  
+    (a,b) <- runDaison db readwritemode $ do 
+      nd1 <- getNdIndex (C firstChar)
+      nd2 <- getNdIndex (C secondChar)
+      case choice of
+        'i' -> handleInsert nd1 nd2
+        'd' -> handleDelete nd1 nd2 
+        's' -> do 
+          start1 <- liftIO $ getCurrentTime
+          flag1 <- fetchLabels (PreLabel nd1) >>= \label1 -> fetchLabels (PreLabel nd2) >>= \label2 -> search nd1  label1 nd2 label2
+          end1 <- liftIO $ getCurrentTime
+          let timePassed1 = diffUTCTime end1 start1  
+          --liftIO $ print timePassed
+          liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  DAILabelModified Search : "++show timePassed1
 
-nextNode :: Nd -> Labels-> Daison (Nd,Labels)
-nextNode nd record = do 
-  (a, arecord) <- nextOf (PreLabel nd) record
-  case a of 
-    (PreLabel n) -> return (n, arecord) 
-    (PostLabel n) -> nextPre (PostLabel n) arecord
+          start <- liftIO $ getCurrentTime
+          flag <- dfsearch nd1 nd2
+          end <- liftIO $ getCurrentTime
+          let timePassed = diffUTCTime end start  
+          --liftIO $ print timePassed
+          liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
 
-nextPre :: PrePostRef -> Labels -> Daison (Nd, Labels)
-nextPre (PreLabel n) record = return (n, record) 
-nextPre (PostLabel n) record = if n <=0 then return (0, record) 
-  else do
-    (b,bRecord) <- nextOf (PostLabel n) record
-    nextPre b bRecord
-
-
-updateDirectInAncestors :: Nd -> Labels -> (Directs -> Directs) -> Daison ()
-updateDirectInAncestors nd (Labels tp pr ps hp dir fc lc ns ls) f = do
-  store graph1Table (Just nd) (Labels tp pr ps hp (f dir) fc lc ns ls)
-  when (tp /= 0) $ do
-    record <- query firstRow (from graph1Table (at tp))
-    updateDirectInAncestors tp record f
+        'r' ->  do
+          dropTable graph1Table
+          dropTable nodeMapTable
+          liftIO main
+      x <- select [ x | x <- from graph1Table everything ] 
+      y <- select [ x | x <- from nodeMapTable everything ]
+      return (x,y)
+    putStrLn "from make dynamic" 
+    mapM_ (\y -> putStrLn (show y) ) a
+--    mapM_ (\y -> putStrLn (show y) ) b
+    closeDB db
+    makeDynamicOperation test_db readwritemode
 
 queryM :: Nd -> Labels-> Nd -> Labels -> Daison Bool
 queryM nd1 label1 nd2 label2 = do
@@ -977,11 +937,5 @@ dfsearch nd1 nd2 = do
       True -> return True
       False -> or <$> (mapM (\x -> dfsearch x nd2) lis)
     [] -> return False
- 
-getEdges :: Nd -> Daison [Nd]
-getEdges nd = do 
-  record <- select [ edgs| ( X n edgs) <- from nodeMapTable (at nd)  ] 
-  return . head $ record
-
 
 
