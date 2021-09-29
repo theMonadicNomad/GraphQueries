@@ -112,3 +112,129 @@ a"fromList [(C 'a',[C 'b',C 'c']),(C 'b',[C 'd',C 'e',C 'f']),(C 'c',[C 'h']),(C
 (10,X {nd = C 'c', edges = [6]})
 (11,X {nd = C 'a', edges = [10,9]})
 "Time for AILabel  for n : 0 d 0.0 : 0.000974s"
+
+
+
+
+
+--to test discrepancies in ailabel and dfsearch 
+[(I 1,[I 2,I 3,I 4,I 5,I 11]),(I 2,[I 6]),(I 3,[I 7,I 12]),(I 4,[I 8,I 11]),(I 5,[I 9,I 10,I 11,I 12]),(I 6,[I 10]),(I 7,[I 12]),(I 8,[I 10,I 11]),(I 9,[I 11,I 12]),(I 10,[I 11,I 12]),(I 11,[I 12]),(I 12,[])]"
+0.001513s
+"Enter number of searches : "
+100
+" nd1:  12 nd2: 11"
+" nd1:  5 nd2: 11"
+" nd1:  5 nd2: 1"
+" nd1:  7 nd2: 6"
+" nd1:  6 nd2: 10"
+" nd1:  12 nd2: 7"
+" nd1:  12 nd2: 2"
+" nd1:  5 nd2: 1"
+" nd1:  9 nd2: 4"
+" nd1:  5 nd2: 3"
+" nd1:  9 nd2: 8"
+" nd1:  9 nd2: 6"
+" nd1:  9 nd2: 3"
+" Result : True Time Taken for Depth First Search : 0.000031s"
+" nd1:  5 nd2: 1"
+" nd1:  9 nd2: 6"
+" nd1:  5 nd2: 4"
+" nd1:  6 nd2: 1"
+" nd1:  9 nd2: 4"
+" nd1:  3 nd2: 1"
+" nd1:  7 nd2: 1"
+" nd1:  5 nd2: 3"
+" nd1:  9 nd2: 6"
+" nd1:  5 nd2: 9"
+" nd1:  8 nd2: 2"
+" nd1:  2 nd2: 1"
+" nd1:  7 nd2: 4"
+" nd1:  6 nd2: 10"
+" nd1:  11 nd2: 1"
+" nd1:  5 nd2: 3"
+" nd1:  8 nd2: 1"
+" nd1:  9 nd2: 6"
+" nd1:  5 nd2: 10"
+" nd1:  4 nd2: 6"
+" nd1:  10 nd2: 2"
+" nd1:  12 nd2: 1"
+" nd1:  7 nd2: 11"
+" nd1:  4 nd2: 10"
+" nd1:  12 nd2: 9"
+" nd1:  6 nd2: 1"
+" nd1:  6 nd2: 1"
+" nd1:  6 nd2: 1"
+" nd1:  6 nd2: 3"
+" nd1:  10 nd2: 1"
+" nd1:  6 nd2: 1"
+" nd1:  5 nd2: 7"
+" nd1:  12 nd2: 5"
+" nd1:  12 nd2: 5"
+" nd1:  5 nd2: 8"
+" nd1:  9 nd2: 6"
+" nd1:  12 nd2: 11"
+" nd1:  12 nd2: 2"
+" nd1:  5 nd2: 4"
+" nd1:  9 nd2: 11"
+" nd1:  4 nd2: 1"
+" nd1:  12 nd2: 8"
+" nd1:  3 nd2: 2"
+" nd1:  7 nd2: 9"
+" nd1:  7 nd2: 9"
+" nd1:  11 nd2: 3"
+" nd1:  4 nd2: 3"
+" nd1:  12 nd2: 8"
+" nd1:  9 nd2: 2"
+" nd1:  5 nd2: 1"
+" nd1:  2 nd2: 1"
+" nd1:  12 nd2: 11"
+" nd1:  12 nd2: 1"
+" nd1:  6 nd2: 10"
+" nd1:  5 nd2: 2"
+" nd1:  6 nd2: 2"
+" nd1:  8 nd2: 2"
+" nd1:  10 nd2: 1"
+" nd1:  7 nd2: 2"
+" nd1:  5 nd2: 1"
+" nd1:  3 nd2: 2"
+" nd1:  7 nd2: 10"
+" nd1:  12 nd2: 2"
+" nd1:  5 nd2: 9"
+" nd1:  12 nd2: 8"
+" nd1:  7 nd2: 8"
+" nd1:  11 nd2: 1"
+" nd1:  12 nd2: 7"
+" nd1:  8 nd2: 10"
+" nd1:  5 nd2: 11"
+" nd1:  7 nd2: 2"
+" nd1:  8 nd2: 2"
+" nd1:  5 nd2: 3"
+" nd1:  8 nd2: 2"
+" nd1:  5 nd2: 9"
+"Enter 'q' to quit: "
+q-------------------
+(1, Pre: 5 Post:  6 Hops: fromList [] Directs:  fromList [])
+(2, Pre: 4 Post:  7 Hops: fromList [] Directs:  fromList [])
+(3, Pre: 3 Post:  8 Hops: fromList [1] Directs:  fromList [3])
+(4, Pre: 2 Post:  9 Hops: fromList [] Directs:  fromList [3])
+(5, Pre: 1 Post:  10 Hops: fromList [] Directs:  fromList [3])
+(6, Pre: 12 Post:  13 Hops: fromList [1] Directs:  fromList [6])
+(7, Pre: 11 Post:  14 Hops: fromList [1] Directs:  fromList [6,7])
+(8, Pre: 16 Post:  17 Hops: fromList [2,3] Directs:  fromList [8])
+(9, Pre: 15 Post:  18 Hops: fromList [2] Directs:  fromList [8,9])
+(10, Pre: 20 Post:  21 Hops: fromList [1,2] Directs:  fromList [10])
+(11, Pre: 19 Post:  22 Hops: fromList [1,2,3] Directs:  fromList [10,11])
+(12, Pre: 0 Post:  23 Hops: fromList [2] Directs:  fromList [3,6,7,8,9,10,11,12])
+(1,X {nd = I 12, edges = []})
+(2,X {nd = I 11, edges = [1]})
+(3,X {nd = I 10, edges = [2,1]})
+(4,X {nd = I 6, edges = [3]})
+(5,X {nd = I 2, edges = [4]})
+(6,X {nd = I 7, edges = [1]})
+(7,X {nd = I 3, edges = [6,1]})
+(8,X {nd = I 8, edges = [2,3]})
+(9,X {nd = I 4, edges = [8,2]})
+(10,X {nd = I 9, edges = [1,2]})
+(11,X {nd = I 5, edges = [10,1,2,3]})
+(12,X {nd = I 1, edges = [11,9,7,5,2]})
+"Time for AILabel  for n : 12 d 4 : 0.001513s"
