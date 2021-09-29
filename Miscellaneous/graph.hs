@@ -184,3 +184,25 @@ generateChildren n c total =   do
   -- putStrLn $ show (values)
 --  return (I <$> [c .. ( if (c + values - 1)> total then total else (c+values-1)) ] )
   return (I <$> [c .. (mod (c+ values-1) total) ] )
+
+
+
+
+getRandomNodes :: Int64 -> IO(Int64,Int64)
+getRandomNodes n = do 
+      gen <- newStdGen
+      let a:b:_ = take 2 (randomRs (1,n) gen) 
+      --putStrLn $ show (values)
+      if (a<b) then return (a,b) else return (b,a)
+--      return (a,b)
+
+
+getNNodes :: IO ()
+getNNodes = foldM_ (\_ m -> do 
+                      (x,y) <- getRandomNodes 1000
+                      print $ show (x,y)
+                      return ()
+                    
+                   )
+                   ()
+                   [1..100]
