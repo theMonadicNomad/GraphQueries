@@ -233,6 +233,58 @@ isAlphabet ch = if ch `elem` ['a'..'z'] || ch `elem` ['A'..'Z']
 		else False
 
 
+generateGraph :: Int64 -> Double ->Graph Node
+generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
+    where 
+        restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
+
+generateTreeGraph :: Int64 -> Int64 -> IO (Graph Node)
+generateTreeGraph  total n  = do
+  if total == 0
+    then return $ Graph []
+    else do
+      let rt = 1 
+      (lrt , ch) <- genChild (total,  rt + 1 , n) rt
+      let rest = (\x -> (I x, [])) <$> ([lrt+1 .. total])
+      final <- mapM (addMoreEdges total n) (ch ++ rest)
+      return $ Graph final
+
+addMoreEdges :: Int64 -> Int64 -> (Node, [Node]) -> IO (Node, [Node])
+addMoreEdges total n (I x, []) = if x == total 
+    then return (I x , [])
+    else do
+      gen <- newStdGen
+      let (nv,gen') = randomR (0,n) gen
+          ls = take (fromEnum nv) (randomRs (x+1,total) gen') 
+      return (I x, I <$> (List.sort $ List.nub ls))
+addMoreEdges total n (I x, ls) = do
+  gen <- newStdGen
+  let I ns = last ls
+      (nv,gen') = randomR (0,n) gen
+      ls' = if (ns==total) then [] else take (fromEnum nv) (randomRs (ns+1,total) gen') 
+  return (I x, ls ++ (I <$> (List.sort $ List.nub ls')))
+
+genChild :: (Int64, Int64, Int64) -> Int64 -> IO (Int64, [(Node, [Node])])
+genChild (total, curr, n) rt = do
+  children <- generateChildren n curr total
+  let curr' = if null children && curr - 1 == rt
+                then curr + 1
+                else curr + (fromIntegral (length children ))
+  (rt',ch) <-
+    if total <= curr'
+      then return (rt, [])
+      else do
+        genChild (total, curr', n) (rt+1) 
+  return (rt', (I rt,children) : ch)
+
+generateChildren :: Int64 -> Int64 -> Int64-> IO [Node]
+generateChildren n c total =   do
+  gen <- newStdGen
+  let values = fst $ (randomR (1,n) gen )
+  -- putStrLn $ show (values)
+  return (I <$> [c .. (mod (c+ values-1) total) ] )
+
+
 main :: IO ()
 main = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
@@ -263,12 +315,13 @@ main = do
   makeDynamicOperation databaseTest ReadWriteMode
 
 
-main1 :: Int64 -> Double -> IO ()
+main1 :: Int64 -> Int64 -> IO ()
 main1 n d = do
   removeFile databaseTest
   IO.hSetBuffering IO.stdin IO.NoBuffering
-  let Graph g1 = generateGraph n d
-  print $ show g1 
+  Graph g1 <- generateTreeGraph n d
+  --print $ show g1 
+  when (n<50) $ print $ show g1
   db <- openDB databaseTest
   (a,b,c)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
@@ -287,19 +340,12 @@ main1 n d = do
     b <- select [ x | x <- from nodeMapTable everything ]
     return (a,b,timePassed)
   putStrLn "FROM dailabel"
-  mapM_ (\y -> putStrLn (show y) ) a
-  mapM_ (\y -> putStrLn (show y) ) b
+  when (n<50) $ do
+    mapM_ (\y -> putStrLn (show y) ) a
+    mapM_ (\y -> putStrLn (show y) ) b
   print $ "Time for  DaiLabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
   closeDB db
   makeDynamicOperation databaseTest ReadWriteMode
-
-
-
-generateGraph :: Int64 -> Double ->Graph Node
-generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
-    where 
-        restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
-
 
 getNdIndex node = do
   nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
@@ -309,8 +355,6 @@ getNdIndex node = do
       pkey <- insert_ nodeMapTable (X node [])
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
-
-
 
 makeDynamicOperation :: String -> AccessMode -> IO()
 makeDynamicOperation test_db readwritemode = do
@@ -329,8 +373,18 @@ makeDynamicOperation test_db readwritemode = do
         'i' -> handleInsert nd1 nd2
         'd' -> handleDelete nd1 nd2 
         's' -> do 
+          start1 <- liftIO $ getCurrentTime
+          flag1 <-  search nd1 nd2 
+          end1 <- liftIO $ getCurrentTime
+          let timePassed1 = diffUTCTime end1 start1  
+          liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  DAILabel Search : "++show timePassed1
+
+          start <- liftIO $ getCurrentTime
           flag <- dfsearch nd1 nd2
-          liftIO $ print  $ " search result : " ++ show flag
+          end <- liftIO $ getCurrentTime
+          let timePassed = diffUTCTime end start  
+          liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
+
       x <- select [ x | x <- from graph1Table everything ] 
       y <- select [ x | x <- from nodeMapTable everything ]
       return (x,y)
@@ -379,7 +433,7 @@ handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
   res2 <- select (from graph1Table (at nd2))  
   par <-  query firstRow (from nodeMapTable (at nd1))
-  allnodes <- getAllNodes
+--  allnodes <- getAllNodes
   case par of
     (X pnd edges) ->  store nodeMapTable (Just nd1) (X pnd (edges ++ [nd2]))
 
@@ -419,11 +473,9 @@ handleInsert nd1 nd2 = do
               store graph1Table (Just nd1) (Labels 0 pre post (Set.singleton nd2) Set.empty)
               return ()
           | otherwise -> do  
-
               (pre,post)  <- insertIsolatedNode              
               let record1 = Labels 0 pre post Set.empty Set.empty 
               store graph1Table (Just nd2) record2{tree_parent=nd1}
---              x <- getCounter
               if Set.null hp2
                 then updateDirectInAncestors nd1 record1 (Set.union dir2)
                 else updateDirectInAncestors nd1 record1 (Set.insert nd2)
@@ -444,85 +496,76 @@ handleInsert nd1 nd2 = do
     insertIsolatedNode = getCounter >>= \x ->incrementCounter >>incrementCounter >> return (x*gap ,(x+1) *gap)
     insert2IsolatedNodes = getCounter >>= \x ->incrementCounter >> incrementCounter >>
       incrementCounter >> incrementCounter >> return ((x*gap),(x+1)*gap,(x+2)*gap,(x+3)*gap)
-
-
+    addHop nd1 (Labels tp pr ps hp dir ) nd2 = do
+      store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir )
+      return ()
+    
 
 getAllNodes :: Daison [Nd]
 getAllNodes = do 
   nodes <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
   return nodes 
 
-
-
-
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
   res2 <- select (from graph1Table (at nd2))
   if( null res1|| null res2 ) then 
-    liftIO $ print $ " node doesn't exist, try again "
+    liftIO $ print $ " node doesn't exist to delete, try again "
     else do 
-    istreeEdge <- isTreeEdge nd1 (head res1) nd2
-    deleteEdge nd1 nd2
-    case istreeEdge of
-      True -> do
-        deleteDirectsandAncestors nd1 (head res1)  nd2
-        removeTreeParent nd2 (head res2)
-        relabel nd2 [] 's'
-        return()
-      False -> do
-        flag <- isTheOnlyNonTreeEdge nd1 (head res1) nd2
-        when flag $ do 
-            case res1 of
-              [(Labels tp pr ps hp dir )] -> do
-                record <- query firstRow (from graph1Table (at tp))
-                deleteDirectsandAncestors tp record nd1
-                when ( not $ Set.null dir && tp/= 0 ) $ do
+    isedge <- isEdge nd1 nd2 
+    if(isedge)
+      then do 
+        istreeEdge <- isTreeEdge nd1 (head res1) nd2
+        deleteEdge nd1 nd2
+        case istreeEdge of
+          True -> do
+            deleteDirectsandAncestors nd1 (head res1)  nd2
+            removeTreeParent nd2 (head res2)
+            relabel nd2 [] 's'
+            return()
+          False -> do
+            flag <- isTheOnlyNonTreeEdge nd1 (head res1) nd2
+            when flag $ do 
+              case res1 of
+                [(Labels tp pr ps hp dir )] -> do
                   record <- query firstRow (from graph1Table (at tp))
-                  updateDirectInAncestors tp record (Set.union dir)
-              _ -> error $ "invalid from handle delete : " ++ show nd1 ++ show nd2
-        deleteHopsFrom nd1 (head res1) nd2
-        return ()
-
-addHop :: Nd -> Labels -> Nd -> Daison ()
-addHop nd1 (Labels tp pr ps hp dir ) nd2 = do
-  store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir )
-  return ()
-
-deleteEdge :: Nd -> Nd -> Daison ()
-deleteEdge nd1 nd2 = do 
-  record <- select [(n, edgs) | (X n edgs) <- from nodeMapTable (at nd1)  ] 
-  case record of
-        [(n , edgs)] -> update_ nodeMapTable (return (nd1, X n (List.delete nd2 edgs)) )
-        _            -> error $ show nd1 ++ " -  " ++ show nd2 ++ " is not an edge"
-
-
-removeTreeParent :: Nd -> Labels -> Daison ()
-removeTreeParent nd1  record1= do 
-  case record1 of
-    Labels tp pr ps hp dir -> do
-      update_ graph1Table (return (nd1, Labels 0 pr ps hp dir) )
-    
-
-
-deleteDirectsandAncestors :: Nd -> Labels-> Nd -> Daison()
-deleteDirectsandAncestors nd1 record1 nd2 = do
-  case record1 of
-    Labels tp pr ps hp dir  -> do
-      update_ graph1Table (return (nd1, Labels tp pr ps hp (Set.delete nd2 dir)  ) )
-      when (tp/=0 && tp /= nd2) $ do
-        record <- query firstRow (from graph1Table (at tp))
-        deleteDirectsandAncestors tp record nd2
-    _ -> error $ "invalid from deletedirectss and ancestors " ++ show nd1 ++ show nd2
-
-
-deleteHopsFrom :: Nd -> Labels ->Nd -> Daison ()
-deleteHopsFrom nd1 record1 nd2 = do
-  case record1 of
-    Labels tp pr ps hp dir -> do
-      update_ graph1Table (return (nd1, Labels tp pr ps (Set.delete nd2 hp) dir ) )
-    _ -> error "invalid"  
-
+                  deleteDirectsandAncestors tp record nd1
+                  when ( not $ Set.null dir && tp/= 0 ) $ do
+                    record <- query firstRow (from graph1Table (at tp))
+                    updateDirectInAncestors tp record (Set.union dir)
+                _ -> error $ "invalid from handle delete : " ++ show nd1 ++ show nd2
+            deleteHopsFrom nd1 (head res1) nd2
+            return ()
+      else do 
+        error $ "the given nodes doesnt form an edge : " ++ show nd1 ++ show nd2
+  where 
+    isEdge nd1 nd2 = do 
+      (X _ nd_edges) <-  query firstRow (from nodeMapTable (at nd1))
+      return (List.elem nd2 nd_edges)
+    deleteEdge nd1 nd2 = do 
+      (X n edgs) <- query firstRow (from nodeMapTable (at nd1))
+      store nodeMapTable (Just nd1) ( X n (List.delete nd2 edgs))
+      return()
+    removeTreeParent nd1  record1 = do 
+      case record1 of
+        Labels tp pr ps hp dir -> do
+          store graph1Table  ( Just nd1) (Labels 0 pr ps hp dir) 
+          return()
+    deleteDirectsandAncestors nd1 record1 nd2 = do
+      case record1 of
+        Labels tp pr ps hp dir  -> do
+          update_ graph1Table (return (nd1, Labels tp pr ps hp (Set.delete nd2 dir)  ) )
+          when (tp/=0 && tp /= nd2) $ do
+            record <- query firstRow (from graph1Table (at tp))
+            deleteDirectsandAncestors tp record nd2
+        _ -> error $ "invalid from deletedirectss and ancestors " ++ show nd1 ++ show nd2
+    deleteHopsFrom nd1 record1 nd2 = do
+      case record1 of
+        Labels tp pr ps hp dir -> do
+          store graph1Table ( Just nd1) ( Labels tp pr ps (Set.delete nd2 hp) dir ) 
+          return()
+        _ -> error "invalid"  
 
 updateDirectInAncestors :: Nd -> Labels -> (Directs -> Directs) -> Daison ()
 updateDirectInAncestors nd (Labels tp pr ps hp dir ) f = do
@@ -532,19 +575,9 @@ updateDirectInAncestors nd (Labels tp pr ps hp dir ) f = do
     updateDirectInAncestors tp record f
 
 isTreeEdge :: Nd -> Labels-> Nd -> Daison Bool
-isTreeEdge nd1 record nd2 = do
-  case record of 
-    (Labels tp pr ps hp dir ) -> case (List.elem nd2 hp) of
-      True -> return False
-      False -> do 
-        nodemap_record <- select [edgs | ( X n edgs) <- from nodeMapTable (at nd1)  ]
-        let nd_edges = head nodemap_record
-        if (List.elem nd2 nd_edges) then 
-          return True
-        else 
-          return False
-    _ -> error $ " from istreeedge : " ++ show nd1 ++ show nd2
- 
+isTreeEdge nd1 record1 nd2 = do
+  case record1 of 
+    (Labels tp pr ps hp dir ) -> return (List.notElem nd2 hp)
 
 isTheOnlyNonTreeEdge :: Nd -> Labels-> Nd -> Daison Bool
 isTheOnlyNonTreeEdge nd1 record1 nd2 = do
@@ -558,39 +591,95 @@ isTheOnlyNonTreeEdge nd1 record1 nd2 = do
           error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
       _ -> error " couldnt find record from isonlynontreeedge "
 
-
-getParent :: Nd -> Daison Nd
-getParent node = do
-  record <- select [(node, labels) | (labels) <- from graph1Table (at node) ] 
-  case record of
-    [] -> error $ "invalid parent node :" ++ show node
-    [(ind1,  label1)] -> case label1 of 
-      (Labels trp _ _ _ _  ) -> return trp
-    _           -> error "multiple parents error "
-
 getCounter :: Daison Nd
-getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
-
-
-getMax :: Daison Nd
-getMax = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
-
-
-updateMax :: Nd -> Daison()
-updateMax newmax =   update_ counters (return (1, ("l_max", newmax) )) 
-
-
+getCounter =   query firstRow (from counters (at 1)) >>= \(_ , count)  -> return count
 
 incrementCounter :: Daison ()
 incrementCounter = do
-  c_counter <- getCounter  
-  update_ counters (return (1, ("counter", c_counter+1) )) 
-  
-
+  (nm, c_counter) <- query firstRow (from counters (at 1))
+  store counters (Just 1) (nm, c_counter+1)
+  return ()
 
 resetCounter :: Daison ()
-resetCounter = update_ counters (return (1, ("counter", 0) ))
+resetCounter = store counters (Just 1) ("counter", 0) >>= \_ -> return ()
 
+reLabelAll :: [Nd] -> [Nd] -> Char-> Daison ()
+reLabelAll  all visited t = do 
+  let difference = all List.\\ visited
+  when (length difference > 0 ) $ do 
+    updatedVisited <-  relabel (head difference) visited t --(S "root")
+    reLabelAll all updatedVisited t
+    return ()
+  return()
+
+relabel :: Nd -> [Nd] -> Char-> Daison [Nd]
+relabel nd visited t =  do 
+  x <- updatePre nd visited
+  if x then return visited
+       else do
+         edges <-   if t == 's' then getTreeEdges nd else getEdges nd
+         --getTree Edges is used to relabel the spanning tree when an edge is deleted in case 1
+         --getEdges is used to relabel the whole spanning tree
+         nv <- case edges of
+           [] -> return visited
+           rest -> foldM (\acc y -> relabel y acc t) visited  rest
+         updatePost nd 
+         return (nd : nv)
+  where    
+    getEdges node = do 
+      (X _ edges) <- query firstRow (from nodeMapTable (at node))
+      return edges
+    getTreeEdges nd1 = do 
+      edges <- getEdges nd1
+      label1 <- query firstRow (from graph1Table (at nd1))
+      filterM (\nd2 -> isTreeEdge nd1 label1 nd2 ) edges 
+
+updatePre :: Nd -> [Nd] -> Daison Bool
+updatePre nd visited = do 
+  label <- query firstRow (from graph1Table (at nd))
+  case label of
+    ( Labels trp pr ps hp dir) -> 
+      if pr == ps || elem nd visited then return True
+        else do
+          c_counter <- getCounter
+          incrementCounter
+          update_ graph1Table (return (nd, Labels trp (c_counter*gap) (c_counter*gap) hp dir  ))
+          return False
+    _ -> error "error " 
+
+updatePost :: Nd -> Daison ()
+updatePost nd = do 
+  label <- query firstRow (from graph1Table (at nd))
+  case label of
+      Labels trp pr ps hp dir  ->  do 
+        c_counter <- getCounter
+        incrementCounter
+        update_ graph1Table (return (nd, Labels trp pr (c_counter*gap) hp dir ))
+      _   -> error "error from updatepost"
+ 
+reLabelprocess ::  Daison ()
+reLabelprocess  = do
+  a <- select [ (ind, edges) | (ind, ( X nd edges )) <- from nodeMapTable everything ]
+  foldM_ (\(index, visited) x -> do 
+    (index', visited') <- reLabelprocessNodes (Map.fromList a) index x visited
+    return (index', visited')) (0, []) a 
+
+reLabelprocessNodes :: GraphMap Nd -> Int64 -> (Nd,[Nd]) ->[Nd] -> Daison (Int64, [Nd])
+reLabelprocessNodes graph index (nd,edges) visited  = do
+  case (elem nd visited) of
+    True -> return (index, visited)
+    False -> do
+      record <- query firstRow (from graph1Table (at nd))
+      case record of
+        (Labels _ _ _ _ _) -> do 
+          (index1, visited') <- foldM (\(i, vis) child -> do
+                                        let edges = fromMaybe [] (Map.lookup child graph)
+                                        (i',vis') <- reLabelprocessNodes graph i (child,edges) vis
+                                        return (i', vis'))
+                                      (index+1, nd:visited)
+                                      edges
+          store graph1Table (Just nd) record{preL = index, postL = index1}
+          return (index1+1, visited' )  
 
 
 queryM :: Nd -> Nd -> Daison Bool
@@ -626,110 +715,5 @@ dfsearch nd1 nd2 = do
   case (head record) of
     lis@(first : rest) -> case (List.elem nd2 lis) of
       True -> return True
-      False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
-
-
-reLabelAll :: [Nd] -> [Nd] -> Char-> Daison ()
-reLabelAll  all visited t = do 
-  let difference = all List.\\ visited
-  when (length difference > 0 ) $ do 
-    updatedVisited <-  relabel (head difference) visited t --(S "root")
-    reLabelAll all updatedVisited t
-    return ()
-  return()
-
-
-relabel :: Nd -> [Nd] -> Char-> Daison [Nd]
-relabel nd visited t =  do 
-  x <- updatePre nd visited
-  if x then return visited
-       else do
-         edges <-  {- if t == 's' then getTreeEdges nd else -}  getEdges nd
-         --getTree Edges is used to relabel the spanning tree when an edge is deleted in case 1
-         --getEdges is used to relabel the whole spanning tree
-         nv <- case edges of
-           [] -> return visited
-           rest -> foldM (\acc y -> relabel y acc t) visited  rest
-         updatePost nd 
-         return (nd : nv)
- 
-updatePre :: Nd -> [Nd] -> Daison Bool
-updatePre nd visited = do 
-  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
-  case record of 
-    [(nd, Labels trp pr ps hp dir)] -> 
-      if pr == ps || elem nd visited then return True
-        else do
-          c_counter <- getCounter
-          incrementCounter
-          update_ graph1Table (return (nd, Labels trp (c_counter*gap) (c_counter*gap) hp dir  ))
-          return False
-    _ -> error "error " 
-
-updatePost :: Nd -> Daison ()
-updatePost nd = do 
-  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels trp pr ps hp dir  ->  do 
-        c_counter <- getCounter
-        incrementCounter
-        update_ graph1Table (return (nd, Labels trp pr (c_counter*gap) hp dir ))
-      _   -> error "error from updatepost"
-    _ -> error "error " 
- 
-{- getTreeEdges :: Nd -> Daison [Nd]
-getTreeEdges nd = do 
-  record <- select [ treeEdges edgs | ( X n edgs) <- from nodeMapTable (at nd)  ] 
-  record1 <- head record
-  label  <- fetchLabels nd
-  return record1
-  where
-    treeEdges es = filterM (\nd2 -> isTreeEdge nd label nd2 ) es 
-    
-      
-fetchLabels (nd) = query firstRow (from graph1Table (at nd)) -}
-
-getEdges :: Nd -> Daison [Nd]
-getEdges nd = do 
-  record <- select [ edgs| ( X n edgs) <- from nodeMapTable (at nd)  ] 
-  return . head $ record
-
-updateDirects :: Nd -> Nd -> Daison()
-updateDirects parent gp = do
-  record <- select [(gp,label1) | (label1) <- from graph1Table (at gp)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels trp pr ps hp dir ->  do
-        update_ graph1Table (return (nd, Labels trp pr ps hp (Set.insert parent dir) ))
-      _ -> error "updatedirects error"
-    _   -> liftIO $ print record
-  when (gp > 0) $ do
-    ggp <- getParent gp
-    when (ggp > 0) $ updateDirects parent ggp
-
-
-reLabelprocess ::  Daison ()
-reLabelprocess  = do
-  a <- select [ (ind, edges) | (ind, ( X nd edges )) <- from nodeMapTable everything ]
-  foldM_ (\(index, visited) x -> do 
-    (index', visited') <- reLabelprocessNodes (Map.fromList a) index x visited
-    return (index', visited')) (0, []) a 
-
-reLabelprocessNodes :: GraphMap Nd -> Int64 -> (Nd,[Nd]) ->[Nd] -> Daison (Int64, [Nd])
-reLabelprocessNodes graph index (nd,edges) visited  = do
-  case (elem nd visited) of
-    True -> return (index, visited)
-    False -> do
-      record <- query firstRow (from graph1Table (at nd))
-      case record of
-        (Labels _ _ _ _ _) -> do 
-          (index1, visited') <- foldM (\(i, vis) child -> do
-                                        let edges = fromMaybe [] (Map.lookup child graph)
-                                        (i',vis') <- reLabelprocessNodes graph i (child,edges) vis
-                                        return (i', vis'))
-                                      (index+1, nd:visited)
-                                      edges
-          store graph1Table (Just nd) record{preL = index, postL = index1}
-          return (index1+1, visited' )  
-                                  
+      False -> or <$> (mapM (\x -> dfsearch x nd2) lis)
+    [] -> return False
