@@ -356,44 +356,6 @@ getNdIndex node = do
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
-makeDynamicOperation :: String -> AccessMode -> IO()
-makeDynamicOperation test_db readwritemode = do
-    IO.hSetBuffering IO.stdin IO.NoBuffering
-    putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion : ")
-    choice <- getChar
-    putStrLn (" Enter the first node : ")
-    firstChar <- getChar
-    putStrLn (" Enter the second node : ")
-    secondChar <- getChar
-    db <- openDB test_db  
-    (a,b) <- runDaison db readwritemode $ do 
-      nd1 <- getNdIndex (C firstChar)
-      nd2 <- getNdIndex (C secondChar)
-      case choice of
-        'i' -> handleInsert nd1 nd2
-        'd' -> handleDelete nd1 nd2 
-        's' -> do 
-          start1 <- liftIO $ getCurrentTime
-          flag1 <-  search nd1 nd2 
-          end1 <- liftIO $ getCurrentTime
-          let timePassed1 = diffUTCTime end1 start1  
-          liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  DAILabel Search : "++show timePassed1
-
-          start <- liftIO $ getCurrentTime
-          flag <- dfsearch nd1 nd2
-          end <- liftIO $ getCurrentTime
-          let timePassed = diffUTCTime end start  
-          liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
-
-      x <- select [ x | x <- from graph1Table everything ] 
-      y <- select [ x | x <- from nodeMapTable everything ]
-      return (x,y)
-    putStrLn "from make dynamic" 
-    mapM_ (\y -> putStrLn (show y) ) a
---    mapM_ (\y -> putStrLn (show y) ) b
-    closeDB db
-    makeDynamicOperation test_db readwritemode
-
 dynamicProcess :: GraphMap Node -> Daison ()
 dynamicProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
@@ -433,7 +395,7 @@ handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
   res2 <- select (from graph1Table (at nd2))  
   par <-  query firstRow (from nodeMapTable (at nd1))
---  allnodes <- getAllNodes
+--  allnodes <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
   case par of
     (X pnd edges) ->  store nodeMapTable (Just nd1) (X pnd (edges ++ [nd2]))
 
@@ -493,18 +455,13 @@ handleInsert nd1 nd2 = do
   return()
   where 
     average x y = x + div (y-x) 2
+    resetCounter = store counters (Just 1) ("counter", 0) >>= \_ -> return ()
     insertIsolatedNode = getCounter >>= \x ->incrementCounter >>incrementCounter >> return (x*gap ,(x+1) *gap)
     insert2IsolatedNodes = getCounter >>= \x ->incrementCounter >> incrementCounter >>
       incrementCounter >> incrementCounter >> return ((x*gap),(x+1)*gap,(x+2)*gap,(x+3)*gap)
     addHop nd1 (Labels tp pr ps hp dir ) nd2 = do
       store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir )
       return ()
-    
-
-getAllNodes :: Daison [Nd]
-getAllNodes = do 
-  nodes <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
-  return nodes 
 
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
@@ -566,6 +523,16 @@ handleDelete nd1 nd2 = do
           store graph1Table ( Just nd1) ( Labels tp pr ps (Set.delete nd2 hp) dir ) 
           return()
         _ -> error "invalid"  
+    isTheOnlyNonTreeEdge nd1 record1 nd2 = do
+        case record1 of
+          Labels trp pr ps hp dir ->  do 
+            if (Set.member nd2 hp) && (Set.size hp ==1) then 
+              return True
+            else if (Set.member nd2 hp) && (Set.size hp > 1) then
+              return False
+            else 
+              error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
+          _ -> error " couldnt find record from isonlynontreeedge "
 
 updateDirectInAncestors :: Nd -> Labels -> (Directs -> Directs) -> Daison ()
 updateDirectInAncestors nd (Labels tp pr ps hp dir ) f = do
@@ -575,21 +542,7 @@ updateDirectInAncestors nd (Labels tp pr ps hp dir ) f = do
     updateDirectInAncestors tp record f
 
 isTreeEdge :: Nd -> Labels-> Nd -> Daison Bool
-isTreeEdge nd1 record1 nd2 = do
-  case record1 of 
-    (Labels tp pr ps hp dir ) -> return (List.notElem nd2 hp)
-
-isTheOnlyNonTreeEdge :: Nd -> Labels-> Nd -> Daison Bool
-isTheOnlyNonTreeEdge nd1 record1 nd2 = do
-    case record1 of
-      Labels trp pr ps hp dir ->  do 
-        if (Set.member nd2 hp) && (Set.size hp ==1) then 
-          return True
-        else if (Set.member nd2 hp) && (Set.size hp > 1) then
-          return False
-        else 
-          error $ "error from istheonlynontreeedge : nd1 , nd2 : " ++ show nd1 ++ show nd2
-      _ -> error " couldnt find record from isonlynontreeedge "
+isTreeEdge nd1 record1@(Labels tp pr ps hp dir ) nd2 =  return (List.notElem nd2 hp)
 
 getCounter :: Daison Nd
 getCounter =   query firstRow (from counters (at 1)) >>= \(_ , count)  -> return count
@@ -599,9 +552,6 @@ incrementCounter = do
   (nm, c_counter) <- query firstRow (from counters (at 1))
   store counters (Just 1) (nm, c_counter+1)
   return ()
-
-resetCounter :: Daison ()
-resetCounter = store counters (Just 1) ("counter", 0) >>= \_ -> return ()
 
 reLabelAll :: [Nd] -> [Nd] -> Char-> Daison ()
 reLabelAll  all visited t = do 
@@ -680,6 +630,44 @@ reLabelprocessNodes graph index (nd,edges) visited  = do
                                       edges
           store graph1Table (Just nd) record{preL = index, postL = index1}
           return (index1+1, visited' )  
+
+makeDynamicOperation :: String -> AccessMode -> IO()
+makeDynamicOperation test_db readwritemode = do
+    IO.hSetBuffering IO.stdin IO.NoBuffering
+    putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion : ")
+    choice <- getChar
+    putStrLn (" Enter the first node : ")
+    firstChar <- getChar
+    putStrLn (" Enter the second node : ")
+    secondChar <- getChar
+    db <- openDB test_db  
+    (a,b) <- runDaison db readwritemode $ do 
+      nd1 <- getNdIndex (C firstChar)
+      nd2 <- getNdIndex (C secondChar)
+      case choice of
+        'i' -> handleInsert nd1 nd2
+        'd' -> handleDelete nd1 nd2 
+        's' -> do 
+          start1 <- liftIO $ getCurrentTime
+          flag1 <-  search nd1 nd2 
+          end1 <- liftIO $ getCurrentTime
+          let timePassed1 = diffUTCTime end1 start1  
+          liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  DAILabel Search : "++show timePassed1
+
+          start <- liftIO $ getCurrentTime
+          flag <- dfsearch nd1 nd2
+          end <- liftIO $ getCurrentTime
+          let timePassed = diffUTCTime end start  
+          liftIO $ print  $ " Result : " ++ show flag ++ " Time Taken for Depth First Search : "++show timePassed
+
+      x <- select [ x | x <- from graph1Table everything ] 
+      y <- select [ x | x <- from nodeMapTable everything ]
+      return (x,y)
+    putStrLn "from make dynamic" 
+    mapM_ (\y -> putStrLn (show y) ) a
+--    mapM_ (\y -> putStrLn (show y) ) b
+    closeDB db
+    makeDynamicOperation test_db readwritemode
 
 
 queryM :: Nd -> Nd -> Daison Bool
