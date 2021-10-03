@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Main where 
+module AILabel where 
 
 import           Database.Daison
 import           System.Environment
@@ -18,10 +18,13 @@ import Control.Monad.IO.Class
 import qualified System.IO as IO
 import Test.QuickCheck 
 import Test.QuickCheck.Monadic
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
 import System.Process (callProcess, callCommand)
+import System.Directory
 import Data.Int
 import System.Random
+import Debug.Trace
+import Data.Time
 
 type Nd = Key Labels
 --  deriving (Eq, Ord, Read, Data)
@@ -81,7 +84,6 @@ data City = City { name :: String,
   
 
 data Labels = Labels {
-{-     tree_parent :: Nd, -}
     pre :: Pre,
     post :: Post,
     hops :: Hops,
@@ -138,27 +140,29 @@ graph2 = Graph
       ( C 'k', [] )
     ]
 
+graph12 :: Graph Node
+graph12 = Graph
+    [ (I 1, [ I 2, I 3] ),
+      (I 2, [ ] ),
+      (I 3, [I 5]),
+      (I 4, [I 5]),
+      (I 5, [I 6] ),
+      (I 6, [ I 7] ),
+      (I 7, [ ] ),
+      (I 8, [] )
+    ]
+ 
+
+
+
+
 
 instance Show Labels where
   show (Labels {- a -} b c d e) = {- "TP: " ++  show a ++ -} " Pre: " ++ show b ++ " Post:  " ++ show c  ++ " Hops: " ++ show d ++ " Directs:  " ++ show e 
 
 
-
-parentTable :: Table Nd
-parentTable = table "parentGraph1" `withIndex` parent_index
-
-
-parent_index :: Index Nd Nd 
-parent_index = index parentTable "parent_index" Prelude.id
-
-
-
 graph1Table :: Table (Labels)
 graph1Table = table "graph1"
-            `withIndex` graph_index
-
-graph_index :: Index Labels Labels 
-graph_index = index graph1Table "node_index" Prelude.id
 
 nodeMapTable :: Table X
 nodeMapTable = table "nodemap" `withIndex` nodemap_index
@@ -167,14 +171,8 @@ nodeMapTable = table "nodemap" `withIndex` nodemap_index
 nodemap_index :: Index X Node
 nodemap_index = index nodeMapTable "nodemap_index" nd
 
-counters :: Table (String, Int)
-counters = table "counter" 
-             `withIndex` counter_index
 
-counter_index :: Index (String, Int) String
-counter_index = index counters "counter_index" fst
-
-databaseTest = "test1.db"
+databaseTest = "ailabel.db"
 
 
 generateGraph :: Int64 -> Double ->Graph Node
@@ -182,219 +180,378 @@ generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
     where 
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
+{- generates tree graphs by taking the input of total number of nodes(n), maximum number of total tree edges(n)
+  and maximum number of non-tree edges -}
+generateTreeGraph :: Int64 -> Int64 -> Int64-> IO (Graph Node)
+generateTreeGraph  total n p  = do
+  if total == 0
+    then return $ Graph []
+    else do
+      let rt = 1 
+      (lrt , ch) <- genChild (total,  rt + 1 , n) rt
+      let rest = (\x -> (I x, [])) <$> ([lrt+1 .. total])
+      final <- mapM (addMoreEdges total p) (ch ++ rest)
+      return $ Graph final
 
-{- main1 :: IO ()
-main1 = do
-  quickCheck prop_graphCSearch
- -}
+addMoreEdges :: Int64 -> Int64 -> (Node, [Node]) -> IO (Node, [Node])
+addMoreEdges total n (I x, []) = if x == total 
+    then return (I x , [])
+    else do
+      gen <- newStdGen
+      let (nv,gen') = randomR (0,n) gen
+          ls = take (fromEnum nv) (randomRs (x+1,total) gen') 
+      return (I x, I <$> (List.sort $ List.nub ls))
+addMoreEdges total n (I x, ls) = do
+  gen <- newStdGen
+  let I ns = last ls
+      (nv,gen') = randomR (0,n) gen
+      ls' = if (ns==total) then [] else take (fromEnum nv) (randomRs (ns+1,total) gen') 
+  return (I x, ls ++ (I <$> (List.sort $ List.nub ls')))
 
-main :: IO ()
-main = do
+genChild :: (Int64, Int64, Int64) -> Int64 -> IO (Int64, [(Node, [Node])])
+genChild (total, curr, n) rt = do
+  children <- generateChildren n curr total
+  let curr' = if null children && curr - 1 == rt
+                then curr + 1
+                else curr + (fromIntegral (length children ))
+  (rt',ch) <-
+    if total <= curr'
+      then return (rt, [])
+      else do
+        genChild (total, curr', n) (rt+1) 
+  return (rt', (I rt,children) : ch)
+
+generateChildren :: Int64 -> Int64 -> Int64-> IO [Node]
+generateChildren n c total =   do
+  gen <- newStdGen
+  let values = fst $ (randomR (1,n) gen )
+  -- putStrLn $ show (values)
+  return (I <$> [c .. (mod (c+ values-1) total) ] )
+
+
+
+
+main1 :: Int64 -> Int64 ->Int64-> IO ()
+main1 n d p = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
-{-   putStrLn ("Enter the number of nodes : ")
-  inp_1 <- getLine
-  putStrLn (" Enter the density : ")
-  inp_2 <- getLine
-  let n = (read inp_1 :: Int64)
-  let d = (read inp_2 :: Double)
-  let Graph g1 = generateGraph n d
-  print $ show g1
- -}
+  Graph g1 <- generateTreeGraph n d p
+  let Graph g = graph2
+  let graphmap1 | n == 0 = Map.fromList g
+                | otherwise = Map.fromList g1
+  when (n<50) $ print $ show graphmap1
+  removeFile databaseTest
+ 
   db <- openDB databaseTest
-  (a,b)  <- runDaison db ReadWriteMode $ do
+  (x,y,z) <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
-    tryCreateTable counters
     tryCreateTable nodeMapTable
-    tryCreateTable parentTable
-{-     c_counter <- getCounter
-    if (c_counter >0) then return ()
-    else
-      do  -}     
-    insert counters (return ( "counter", 0 ))
-    let Graph g = graph2
-    let graphmap1 =  Map.fromList g
-    process graphmap1
-    a <- select [ x | x <- from graph1Table everything ]
-    b <- select [ x | x <- from parentTable everything ]
-    return (a,b)
-  mapM_ (\y -> putStrLn (show y) ) a
-  mapM_ (\y -> putStrLn (show y) ) b
+    start <- liftIO $ getCurrentTime
+    staticProcess graphmap1
+    end <- liftIO $ getCurrentTime
+    let timePassed = diffUTCTime end start  
+    liftIO $ print $ " AILabel Index creation time:" ++  show timePassed 
+    x<-select (from graph1Table everything)
+    y<-select (from nodeMapTable everything)
+    performRandomSearch n
+    return (x,y,  timePassed)
+
+  putStrLn "-------------------"
+  print $ " Do you want to display all the contents of graph and nodemap table (y/n): "
+  process_char <- getChar
+  when (process_char == 'y') $ do
+    mapM_ print x
+    mapM_ print y
+  print $ "Time for AILabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show z
+
   closeDB db
+  performManualSearch databaseTest ReadWriteMode
 
-    
-process :: GraphMap Node-> Daison ()
-process graphmap = do
-  let firstnode = fst $ Map.elemAt 0 graphmap
-  processNodes graphmap firstnode firstnode
-  processRemainingNodes graphmap
 
-processRemainingNodes :: GraphMap Node -> Daison ()
-processRemainingNodes graphmap = do 
-  nodes <- select [nd | (ind, ( X nd nodeindex )) <- from nodeMapTable everything  ]
-  let graphlist = Map.toList graphmap
-  let nodelist = map (\(x,y) -> x ) graphlist
-  let difference = nodelist List.\\ nodes
-  liftIO $ print $ " nodes :  " ++ show nodes
-  liftIO $ print $ " difference : " ++ show difference
-  liftIO $ print $ " nodelist : " ++ show nodelist
-  when (length difference > 0 ) $ do 
-    processNodes graphmap (head difference) (head difference)
-    processRemainingNodes graphmap
-  return()
+staticProcess :: GraphMap Node-> Daison ()
+staticProcess graph = do
+  foldM_ (\index x -> do (index',id,is_tree) <- processNodes graph index x
+                         return index')
+         0
+         (Map.toList graph)
 
-processNodes :: GraphMap Node -> Node -> Node -> Daison()
-processNodes graph nd parent = do
-  x <- insertNodeinDB nd parent
-  unless x $ do
-    let adjacent = Map.lookup nd graph
-    case adjacent of
-      Nothing -> return ()
-      Just []      -> return ()
-      Just rest    -> mapM_ (\x -> processNodes graph x nd ) rest
-    getNdIndex nd >>= \nd1 -> updatePost nd1
+processNodes :: GraphMap Node -> Int -> (Node,[Node]) -> Daison (Int,Nd,Maybe [Nd])
+processNodes graph index (nd,edges) = do
+  res <- select (from nodemap_index (at nd))
+  case res of
+    []   -> do (index1,tree_edges,dirs0,hops) <-
+                  foldM (\(i,tree_edges,dirs,hops) child -> do
+                              let edges = fromMaybe [] (Map.lookup child graph)
+                              (i,id,is_tree) <- processNodes graph i (child,edges)
+                              case is_tree of
+                                Nothing    -> return (i,tree_edges,dirs,id:hops)
+                                Just dirs' -> return (i,id:tree_edges,dirs'++dirs,hops))
+                        (index+1,[],[],[])
+                        edges
+               id <- store nodeMapTable Nothing (X nd (tree_edges++hops))
+               let dirs | null hops = dirs0
+                        | otherwise = id:dirs0
+               store graph1Table (Just id) (Labels index index1 (Set.fromList hops) (Set.fromList dirs))
+               return (index1+1,id,Just dirs)
+    [id] -> return (index,id,Nothing)
+
 
 getNdIndex node = do
   nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
   case nod of
     [nd] -> return nd
-    []   -> do 
-      --c_counter <- getCounter
-      --incrementCounter >> incrementCounter
-      pkey <- insert_ nodeMapTable (X node [])
-      store  graph1Table (Just pkey) (Labels {- (-1) -} (-3) (-2) Set.empty Set.empty  )
-      return pkey
+    []   -> error $ "no such node in the database" ++ show nod
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
-insertNodeinDB :: Node -> Node -> Daison Bool
-insertNodeinDB node parent = do
-  map <- select [ind | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == node  ]
-  par <- if (node == parent) then return [(0,(S "root",[]))] else select [(ind,(nd, edgess)) | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == parent  ]
---  liftIO $ print $ " map : " ++ show map ++ " par" ++ show par 
-  let parent_ndmp = fst . head $ par
-  let edges_par = snd . snd . head $ par 
-  let parent_ndc = fst . snd . head $ par
-  case map of
-    [] -> do
-      c_counter <- getCounter
-      incrementCounter
-      pkey <-  insert_ nodeMapTable (X node [])
-      store graph1Table (Just pkey) (Labels {- parent_ndmp -} c_counter c_counter Set.empty Set.empty )    
-      store parentTable (Just pkey) parent_ndmp
-      when (parent_ndmp > 0) $ do
---        parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
---        case parent_record of
---          [(indp ,(Labels ptrp ppr pps php pdir pte))] -> update_ graph1Table (return (indp,(Labels ptrp ppr pps php pdir (pkey:pte)) ))
---        parent_ndmprecord <- select [(ind,edgess) | (ind, ( X nd edgess )) <- from nodeMapTable everything , nd == parent  ]
-        update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (pkey:edges_par) ) ))
 
-      return False
-    [nod]   ->  do
-      parent_record <- select [(parent_ndmp, labels2) | (labels2) <- from graph1Table (at parent_ndmp)  ] 
-      case parent_record of 
-          [] -> error "error "
-          [(indp, labelp)] -> case labelp of 
-            (Labels {- ptrp -} ppr pps php pdir) -> do
-              update_ graph1Table (return (indp,(Labels {- ptrp -} ppr pps (Set.insert (head map) php ) pdir) ))
-              ptrp1 <- getParent1 parent_ndmp
-              when (ptrp1 > 0) $ updateDirects parent_ndmp ptrp1 
-      update_ nodeMapTable  (return (parent_ndmp, (X parent_ndc (nod:edges_par) ) ))
+performRandomSearch  :: Int64 -> Daison ()
+performRandomSearch p = do
+  liftIO $ print $  "Enter number of searches : "
+  firstChar <- liftIO $ getLine
+  let n = read firstChar :: Int64
+  foldM_ (\_ m -> do 
+                      (x,y) <- liftIO $ getRandomNodes p
+                      when(x/=y) $ do 
+                        resx <- select (from nodemap_index (at x))
+                        resy <- select (from nodemap_index (at y))
+                        processSearching (head resx) (head resy)
+                        return ()                    
+                   )
+                   ()
+                   [1..n]
+  liftIO $ print $ "Enter 'q' to quit: "
+  qChar <- liftIO $ getChar
+  if(qChar == 'q') then return ()
+    else performRandomSearch p
 
-      return True 
-{-     first : rest -> error "duplicate records in the database table, please verify"
+getRandomNodes :: Int64 -> IO(Node,Node)
+getRandomNodes n = do 
+      gen <- newStdGen
+      let a:b:_ = take 2 (randomRs (1,n) gen) 
+      return (I a, I b)
+--      if (a<b) then return (I a,I b) else return (I b,I a)
+
+processSearching :: Nd ->Nd-> Daison()
+processSearching nd1  nd2 = do 
+{-     liftIO $ print  $ " nd1:  " ++ show nd1 ++ " nd2: " ++ show nd2 -}
+
+    start11 <- liftIO $ getCurrentTime
+    (flag11, _) <- search1 nd1 nd2 1 (Set.empty)
+    end11 <- liftIO $ getCurrentTime
+    let timePassed11 = diffUTCTime end11 start11  
+
+    
+    when (flag11) $ do 
+--      liftIO $ print  $ " Result : " ++ show flag11 ++ " Time Taken for  AILabel1 Optimized Search1 : "++show timePassed11
+
+{-  
+     start1 <- liftIO $ getCurrentTime
+      flag1 <- search nd1 nd2 1
+      end1 <- liftIO $ getCurrentTime
+      let timePassed1 = diffUTCTime end1 start1  
+      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+
+      start <- liftIO $ getCurrentTime
+      (flag, count) <- df_search nd1 nd2 0
+      end <- liftIO $ getCurrentTime
+      let timePassed = diffUTCTime end start  
+      liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
  -}
-
-updatePost :: Nd -> Daison ()
-updatePost nd = do 
-  record <- select [(nd,label1) | (label1) <- from graph1Table (at nd)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels {- trp -} pr ps hp dir  ->  do 
-        c_counter <- getCounter
-        incrementCounter
-        update_ graph1Table (return (nd, Labels {- trp -} pr c_counter hp dir ))
-      _   -> error "error from updatepost"
-    _ -> error "error " 
-
-updateDirects :: Nd -> Nd -> Daison()
-updateDirects parent gp = do
-  record <- select [(gp,label1) | (label1) <- from graph1Table (at gp)  ] 
-  case record of 
-    [(nd, label)] -> case label of
-      Labels {- trp -} pr ps hp dir ->  do
-        update_ graph1Table (return (nd, Labels {- trp -} pr ps hp (Set.insert parent dir) ))
-      _ -> error "updatedirects error"
-    _   -> liftIO $ print record
-  when (gp /= 0) $ do
-    ggp <- getParent1 gp
-    when (ggp /= 0) $ updateDirects parent ggp
-
-{- getParent :: Nd -> Daison Nd
-getParent node = do
-  record <- select [(node, labels) | (labels) <- from graph1Table (at node) ] 
-  case record of
-    [] -> error $ "invalid parent node :" ++ show node
-    [(ind1,  label1)] -> case label1 of 
-      (Labels trp _ _ _ _ ) -> return trp
-    _           -> error "multiple parents error "
+      start2 <- liftIO $ getCurrentTime
+      (flag2, count2) <- df_search1 [nd1] nd2 0 
+      end2 <- liftIO $ getCurrentTime
+      let timePassed2 = diffUTCTime end2 start2  
+--      liftIO $ print  $ " Result : " ++ show flag2  ++ " Nodes: " ++ show count2 ++" Time Taken for Depth First Search : "++show timePassed2
+      liftIO $ print  $ " Nodes: " ++ show count2 ++ " AI: " ++ show (timePassed11*1000)++ " DS: "++show (timePassed2 *1000) 
+      
+{-       if(flag11 && flag1 && flag && flag2 ) then return ()
+        else do  -}
+{-     when (flag1/=flag2) $ do
+      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
  -}
-getParent1 :: Nd -> Daison Nd
-getParent1 node = do
-  record <- select [parent | parent <- from parentTable (at node) ] 
-  case record of
-    [] -> error $ "invalid parent node :" ++ show node
-    [par] ->  return par
-    _           -> error "multiple parents error "
-
- 
-getCounter :: Daison Int
-getCounter = select [ x | x <- from counters (at 1) ] >>= \p -> return . snd . head $ p  
-
-incrementCounter :: Daison ()
-incrementCounter = do
-  c_counter <- getCounter  
-  liftIO $ print $ " counter current value : " ++ show (c_counter+1) 
-  update_ counters (return (1, ("counter", c_counter+1) )) 
-  
+    return ()
 
 
-resetCounter :: Daison ()
-resetCounter = update_ counters (return (1, ("counter", 0) ))
+performManualSearch :: String -> AccessMode -> IO()
+performManualSearch test_db readwritemode = do
+    IO.hSetBuffering IO.stdin IO.NoBuffering
+{-     putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion : ")
+    choice <- getChar -}
+    putStrLn (" Enter the graph type (I) for Integer, (C) for Character : ")
+    gType <- getChar
+    putStrLn (" Enter the first node to search : ")
+    firstChar <- getLine
+    putStrLn (" Enter the second node : ")
+    secondChar <- getLine
+    db <- openDB test_db  
+    runDaison db readwritemode $ do 
+      (nd1,nd2) <- if (gType == 'I') then 
+        do 
+          nd1 <- getNdIndex (I (read firstChar :: Int64))
+          nd2 <- getNdIndex (I (read secondChar :: Int64))
+          return (nd1,nd2)
+        else do
+          nd1 <- getNdIndex (C (head firstChar))
+          nd2 <- getNdIndex (C (head secondChar :: Char))
+          return (nd1,nd2)
+      start1 <- liftIO $ getCurrentTime
+      flag1 <- search1 nd1 nd2 1 (Set.empty)
+      end1 <- liftIO $ getCurrentTime
+      let timePassed1 = diffUTCTime end1 start1  
+      --liftIO $ print timePassed
+      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
+
+{-       start <- liftIO $ getCurrentTime
+      (flag, count) <- df_search nd1 nd2 0
+      end <- liftIO $ getCurrentTime
+      let timePassed = diffUTCTime end start  
+      --liftIO $ print timePassed
+      liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
+ -}
+      start2 <- liftIO $ getCurrentTime
+      (flag2) <- df_search1 [nd1] nd2  0
+      end2 <- liftIO $ getCurrentTime
+      let timePassed2 = diffUTCTime end2 start2  
+      --liftIO $ print timePassed
+      liftIO $ print  $ " Result : " ++ show flag2  ++ " Time Taken for Depth First Search : "++show timePassed2
 
 
-queryM :: Nd -> Nd -> Daison Bool
-queryM nd1 nd2 = do
-  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
-  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+{-       x <- select [ x | x <- from graph1Table everything ] 
+      y <- select [ x | x <- from nodeMapTable everything ] -}
+      return ()
+    putStrLn "make dynamic" 
+--    mapM_ (\y -> putStrLn (show y) ) a
+--    mapM_ (\y -> putStrLn (show y) ) b
+    closeDB db
+    performManualSearch test_db readwritemode
+
+
+step1 :: Nd -> Nd ->Labels-> Daison Bool
+step1 nd1 nd2 label2 = do
+  label1 <- query firstRow (from graph1Table (at nd1)) 
+--  liftIO  $ print  $ " from QUERY " ++ show nd1 ++ " :  " ++ show nd2
   case label1 of 
-    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
+    (Labels pre1 post1 hp1 dir1) -> do
       case label2 of
-        [(Labels {- trp2 -} pre2 post2 hp2 dir2)] -> if  (pre1 < post2 && post2 <= post1) then return True
+        (Labels pre2 post2 hp2 dir2) -> if  (pre1 < post2 && post2 <= post1) then return True
                                              else return False
         _ -> error "error "                
     _ -> error "error again "
 
-
-search :: Nd -> Nd -> Daison Bool
-search nd1 nd2 = do
-  label1 <- select [labels | (labels) <- from graph1Table (at nd1)  ] 
-  label2 <- select [labels | (labels) <- from graph1Table (at nd2)  ]
+--Main search function for AILabel
+search :: Nd -> Nd ->Int -> Daison Bool
+search nd1 nd2 step = do
+  label1 <- query firstRow (from graph1Table (at nd1)) 
+  label2 <- query firstRow (from graph1Table (at nd2)) 
+--  liftIO  $ print  $ " from SEARCH " ++ show nd1 ++ " :  " ++ show nd2
   case label1 of 
-    [(Labels {- trp1 -} pre1 post1 hp1 dir1)] -> do
-      flag <- queryM nd1 nd2
-      if flag then return True
-      else do
-        x <- or <$> (mapM (\x -> queryM x nd2) (Set.toList hp1)) 
-        if not x 
-          then or <$> (mapM (\x -> queryM x nd2) (Set.toList dir1)) 
-        else return x
+    (Labels  pre1 post1 hp1 dir1) -> do
+      if (step ==1) then do
+        flag <- step1 nd1 nd2 label2
+        if flag then return True
+          else do
+            x <- or <$> (mapM (\x -> search x nd2 1) (Set.toList hp1)) 
+            if x then return True
+            else do
+              or <$> (mapM (\x -> search  x nd2 2) ( filter (/=nd1) (Set.toList dir1)) )
+        else do
+          x <- or <$> (mapM (\x -> search x nd2 1) (Set.toList hp1)) 
+          if x then return True
+            else do
+              or <$> (mapM (\x -> search  x nd2 2) ( filter (/=nd1)(Set.toList dir1)) )
+
+--optimized AILabel search function.
+search1 :: Nd -> Nd ->Int -> (Set (Nd,Nd)) -> Daison (Bool, Set (Nd, Nd))
+search1 nd1 nd2 step queryset = do
+  let newset = (Set.insert (nd1,nd2) queryset)
+  label1 <- query firstRow (from graph1Table (at nd1)) 
+  label2 <- query firstRow (from graph1Table (at nd2)) 
+--  liftIO  $ print  $ " from SEARCH " ++ show nd1 ++ " :  " ++ show nd2
+  case label1 of 
+    (Labels pre1 post1 hp1 dir1) -> do
+      if (step ==1) then do
+        flag <- step1 nd1 nd2 label2
+        if flag then return (True, newset)
+          else do
+            (x,s'') <- foldM (\(b,s ) x -> do 
+                            if (Set.member (x,nd2) s ) then return (b,s)
+                              else do 
+                                (b',s') <- search1 x nd2 1 s                                   
+                                return (b'||b ,s'))
+                        (False, newset)
+                        (Set.toList hp1) 
+            if x then return (True,s'')
+            else do
+                foldM (\(b,s) x -> do
+                          if (Set.member (x,nd2) s ) then return (b,s)
+                            else do 
+                              (b',s') <- search1 x nd2 2 s                                  
+                              return (b'||b, s' ))
+                      (False, s'')
+                      ( filter (/=nd1)(Set.toList dir1)) 
+        else do
+          (x,s'') <- foldM (\(b,s) x -> do 
+                                     if (Set.member (x, nd2) s) then return (b,s)
+                                        else do 
+                                          (b',s') <- search1 x nd2 1 s                                 
+                                          return (b'||b,s' ))
+                                  (False, newset)
+                                  (Set.toList hp1) 
+          if x then return (True,s'')
+            else do
+              foldM (\(b,s) x -> do 
+                                    if (Set.member (x, nd2) s ) then return (b,s)
+                                      else do 
+                                        (b',s') <- search1 x nd2 2 s                               
+                                        return (b'||b,s' ))
+                                  (False,s'')
+                                  ( filter (/=nd1)(Set.toList dir1)) 
 
 dfsearch :: Nd -> Nd -> Daison Bool
 dfsearch nd1 nd2 = do 
   record <- select [edgs | (X n edgs) <- from nodeMapTable (at nd1)  ] 
+{-   liftIO  $ print  $ " from liftio graph " ++ show record ++ " for node : " ++ show nd1 -}
   case (head record) of
     lis@(first : rest) -> case (List.elem nd2 lis) of
       True -> return True
-      False -> or <$> (mapM (\x -> dfsearch x nd2) rest)
+      False -> or <$> (mapM (\x -> dfsearch x nd2) lis)
+    [] -> return False
+
+
+df_search :: Nd -> Nd ->Int64-> Daison (Bool, Int64)
+df_search nd1 nd2 count = do 
+  record <- select [edgs | (X n edgs) <- from nodeMapTable (at nd1)  ] 
+  (X n edges) <- query firstRow (from nodeMapTable (at nd1)) 
+--  liftIO $ print $ " countMaam : " ++ show (count) ++ " nd1 : " ++ show nd1 ++ " edges :" ++show edges ++" nd2 : " ++ show nd2
+{-   liftIO  $ print  $ " from liftio graph " ++ show record ++ " for node : " ++ show nd1 -}
+  case edges of
+    (first : rest) -> case (List.elem nd2 edges) of
+      True -> return (True, count)
+      False -> do (b',i') <-foldM (\(b, i) x -> do 
+                                     (b',i') <- df_search x nd2 (i+1)
+                                     return (b'||b , i'))
+                                  (False, (count))
+                                  edges
+                  return (b',i')
+    [] ->  return (False,count)
+
+
+df_search1 :: [Nd] -> Nd-> Int64 -> Daison (Bool, Int64)
+df_search1 (nd1:rs) nd2 count  = do 
+  (X n edges) <- query firstRow (from nodeMapTable (at nd1)) 
+--  liftIO $ print $ " nd1 : " ++ show nd1 ++ " edges :" ++show edges ++" nd2 : " ++ show nd2
+  case edges of
+    (first : rest) -> case (List.elem nd2 edges) of
+      True -> return (True, count)
+      False -> do
+        (b, count') <- df_search1 [first] nd2 (count +1)
+        if(b) then return (True, count') 
+          else do
+            (c, count'') <- if (rest == []) then return (b, count') else df_search1 rest nd2 (count'+1)
+            if (c) then return (True, count'') 
+              else do 
+                if (rs == []) then return (c, count'') else df_search1 rs nd2 (count''+1)
+    [] -> if (rs == []) then return (False, count) else df_search1 rs nd2 (count+1)
+       --return (False, count)
 
 
 
