@@ -12,6 +12,8 @@ Implementing GraphQueries in Haskell using Reachability Queries. The Graph Queri
   - [`AILabel.hs/`](DAILabel/app/AILabel.hs) - Implementation of AILabel Algorithm
   - [`DAILabel.hs/`](DAILabel/app/DAILabel.hs) - Implementation of D-AILabel algorithm
   - [`DAILabelModified.hs/`](DAILabel/app/DAILabelModified.hs) - Implementation of D-AILabel with smart relabelling technique.
+  
+- [`Reports/`](Reports) - reports
 
 ## How to run the application
 
