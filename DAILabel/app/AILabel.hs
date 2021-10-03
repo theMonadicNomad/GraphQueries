@@ -180,7 +180,8 @@ generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
     where 
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
-
+{- generates tree graphs by taking the input of total number of nodes(n), maximum number of total tree edges(n)
+  and maximum number of non-tree edges -}
 generateTreeGraph :: Int64 -> Int64 -> Int64-> IO (Graph Node)
 generateTreeGraph  total n p  = do
   if total == 0
@@ -245,27 +246,29 @@ main1 n d p = do
     tryCreateTable graph1Table
     tryCreateTable nodeMapTable
     start <- liftIO $ getCurrentTime
-    process graphmap1
+    staticProcess graphmap1
     end <- liftIO $ getCurrentTime
     let timePassed = diffUTCTime end start  
     liftIO $ print $ " AILabel Index creation time:" ++  show timePassed 
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
-    makeDynamic n
-    return (x,y,1 {- timePassed -})
+    performRandomSearch n
+    return (x,y,  timePassed)
 
   putStrLn "-------------------"
-  mapM_ print x
-  mapM_ print y
+  print $ " Do you want to display all the contents of graph and nodemap table (y/n): "
+  process_char <- getChar
+  when (process_char == 'y') $ do
+    mapM_ print x
+    mapM_ print y
   print $ "Time for AILabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show z
 
   closeDB db
-  makeDynamicOperation databaseTest ReadWriteMode
+  performManualSearch databaseTest ReadWriteMode
 
 
-    
-process :: GraphMap Node-> Daison ()
-process graph = do
+staticProcess :: GraphMap Node-> Daison ()
+staticProcess graph = do
   foldM_ (\index x -> do (index',id,is_tree) <- processNodes graph index x
                          return index')
          0
@@ -300,8 +303,8 @@ getNdIndex node = do
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
 
-makeDynamic  :: Int64 -> Daison ()
-makeDynamic p = do
+performRandomSearch  :: Int64 -> Daison ()
+performRandomSearch p = do
   liftIO $ print $  "Enter number of searches : "
   firstChar <- liftIO $ getLine
   let n = read firstChar :: Int64
@@ -318,7 +321,7 @@ makeDynamic p = do
   liftIO $ print $ "Enter 'q' to quit: "
   qChar <- liftIO $ getChar
   if(qChar == 'q') then return ()
-    else makeDynamic p
+    else performRandomSearch p
 
 getRandomNodes :: Int64 -> IO(Node,Node)
 getRandomNodes n = do 
@@ -329,56 +332,47 @@ getRandomNodes n = do
 
 processSearching :: Nd ->Nd-> Daison()
 processSearching nd1  nd2 = do 
-
-
+{-     liftIO $ print  $ " nd1:  " ++ show nd1 ++ " nd2: " ++ show nd2 -}
 
     start11 <- liftIO $ getCurrentTime
     (flag11, _) <- search1 nd1 nd2 1 (Set.empty)
     end11 <- liftIO $ getCurrentTime
     let timePassed11 = diffUTCTime end11 start11  
 
-
+    
     when (flag11) $ do 
-      start1 <- liftIO $ getCurrentTime
+--      liftIO $ print  $ " Result : " ++ show flag11 ++ " Time Taken for  AILabel1 Optimized Search1 : "++show timePassed11
+
+{-  
+     start1 <- liftIO $ getCurrentTime
       flag1 <- search nd1 nd2 1
       end1 <- liftIO $ getCurrentTime
       let timePassed1 = diffUTCTime end1 start1  
+      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
 
       start <- liftIO $ getCurrentTime
       (flag, count) <- df_search nd1 nd2 0
       end <- liftIO $ getCurrentTime
       let timePassed = diffUTCTime end start  
-
+      liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
+ -}
       start2 <- liftIO $ getCurrentTime
       (flag2, count2) <- df_search1 [nd1] nd2 0 
       end2 <- liftIO $ getCurrentTime
       let timePassed2 = diffUTCTime end2 start2  
+--      liftIO $ print  $ " Result : " ++ show flag2  ++ " Nodes: " ++ show count2 ++" Time Taken for Depth First Search : "++show timePassed2
+      liftIO $ print  $ " Nodes: " ++ show count2 ++ " AI: " ++ show (timePassed11*1000)++ " DS: "++show (timePassed2 *1000) 
+      
 {-       if(flag11 && flag1 && flag && flag2 ) then return ()
         else do  -}
-      when (1 == 1) $ do  
-          liftIO $ print  $ " nd1:  " ++ show nd1 ++ " nd2: " ++ show nd2
-
-          liftIO $ print  $ " Result : " ++ show flag11 ++ " Time Taken for  AILabel1 Optimized Search1 : "++show timePassed11
-
-          liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
-
-
-          liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
-      
-
-          liftIO $ print  $ " Result : " ++ show flag2  ++ " Nodes: " ++ show count2 ++" Time Taken for Depth First Search : "++show timePassed2
-          return ()
 {-     when (flag1/=flag2) $ do
       liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
  -}
     return ()
 
 
-
-
-
-makeDynamicOperation :: String -> AccessMode -> IO()
-makeDynamicOperation test_db readwritemode = do
+performManualSearch :: String -> AccessMode -> IO()
+performManualSearch test_db readwritemode = do
     IO.hSetBuffering IO.stdin IO.NoBuffering
 {-     putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion : ")
     choice <- getChar -}
@@ -400,19 +394,19 @@ makeDynamicOperation test_db readwritemode = do
           nd2 <- getNdIndex (C (head secondChar :: Char))
           return (nd1,nd2)
       start1 <- liftIO $ getCurrentTime
-      flag1 <- search nd1 nd2 1
+      flag1 <- search1 nd1 nd2 1 (Set.empty)
       end1 <- liftIO $ getCurrentTime
       let timePassed1 = diffUTCTime end1 start1  
       --liftIO $ print timePassed
       liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
 
-      start <- liftIO $ getCurrentTime
+{-       start <- liftIO $ getCurrentTime
       (flag, count) <- df_search nd1 nd2 0
       end <- liftIO $ getCurrentTime
       let timePassed = diffUTCTime end start  
       --liftIO $ print timePassed
       liftIO $ print  $ " Result : " ++ show flag ++ " Nodes: " ++ show count ++ " Time Taken for Depth First Search : "++show timePassed
-
+ -}
       start2 <- liftIO $ getCurrentTime
       (flag2) <- df_search1 [nd1] nd2  0
       end2 <- liftIO $ getCurrentTime
@@ -428,10 +422,7 @@ makeDynamicOperation test_db readwritemode = do
 --    mapM_ (\y -> putStrLn (show y) ) a
 --    mapM_ (\y -> putStrLn (show y) ) b
     closeDB db
-    makeDynamicOperation test_db readwritemode
-
-
-
+    performManualSearch test_db readwritemode
 
 
 step1 :: Nd -> Nd ->Labels-> Daison Bool
@@ -446,7 +437,7 @@ step1 nd1 nd2 label2 = do
         _ -> error "error "                
     _ -> error "error again "
 
-
+--Main search function for AILabel
 search :: Nd -> Nd ->Int -> Daison Bool
 search nd1 nd2 step = do
   label1 <- query firstRow (from graph1Table (at nd1)) 
@@ -468,6 +459,7 @@ search nd1 nd2 step = do
             else do
               or <$> (mapM (\x -> search  x nd2 2) ( filter (/=nd1)(Set.toList dir1)) )
 
+--optimized AILabel search function.
 search1 :: Nd -> Nd ->Int -> (Set (Nd,Nd)) -> Daison (Bool, Set (Nd, Nd))
 search1 nd1 nd2 step queryset = do
   let newset = (Set.insert (nd1,nd2) queryset)

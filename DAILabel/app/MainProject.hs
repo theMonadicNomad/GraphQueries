@@ -60,7 +60,6 @@ main = do
   putStrLn ("a for AILabel")
   putStrLn ("d for DAILabel")
   putStrLn ("m for DAILabelModified")
-{-   putStrLn("b for Benchmarking") -}
   putStrLn ("Enter your choice : ")
   process_char <- getChar
   let n = (read inp_1 :: Int64)
@@ -68,6 +67,6 @@ main = do
   let p = (read inp_3 :: Int64)
   case process_char of
     'a' -> AILabel.main1 n d p
-    'd' -> DAILabel.main1 n d
-    'm' -> DAILabelModified.main1 n d
+    'd' -> DAILabel.main1 n d p
+    'm' -> DAILabelModified.main1 n d p
     _   -> putStrLn("Try again ") >> main
