@@ -300,15 +300,17 @@ ranValues gen n a b = do
   putStrLn $ show newGen
   return (values, newGen)
 
-generateTreeGraph :: Int64 -> Int64 -> IO (Graph Node)
-generateTreeGraph  total n  = do
+{- generates tree graphs by taking the input of total number of nodes(n), maximum number of total tree edges(n)
+  and maximum number of non-tree edges -}
+generateTreeGraph :: Int64 -> Int64 -> Int64-> IO (Graph Node)
+generateTreeGraph  total n p  = do
   if total == 0
     then return $ Graph []
     else do
       let rt = 1 
       (lrt , ch) <- genChild (total,  rt + 1 , n) rt
       let rest = (\x -> (I x, [])) <$> ([lrt+1 .. total])
-      final <- mapM (addMoreEdges total n) (ch ++ rest)
+      final <- mapM (addMoreEdges total p) (ch ++ rest)
       return $ Graph final
 
 addMoreEdges :: Int64 -> Int64 -> (Node, [Node]) -> IO (Node, [Node])
@@ -372,17 +374,16 @@ main = do
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
     return (a,b)
-  putStrLn "FROM MAIN"
   mapM_ (\y -> putStrLn (show y) ) a
   mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
-  makeDynamicOperation databaseTest ReadWriteMode
+  performOperation databaseTest ReadWriteMode
 
-main1  :: Int64 -> Int64 -> IO ()
-main1 n d= do
+main1  :: Int64 -> Int64 ->Int64-> IO ()
+main1 n d p = do
   removeFile databaseTest
   IO.hSetBuffering IO.stdin IO.NoBuffering
-  Graph g1 <- generateTreeGraph n d
+  Graph g1 <- generateTreeGraph n d p
 --  let Graph g1 = generateGraph n d
   when (n<50) $ print $ show g1
   db <- openDB databaseTest
@@ -405,7 +406,7 @@ main1 n d= do
     mapM_ (\y -> putStrLn (show y) ) b
   print $ "Time for  DaiLabel modified for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
   closeDB db
-  makeDynamicOperation databaseTest ReadWriteMode
+  performOperation databaseTest ReadWriteMode
 
 getNdIndex node = do
   nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
@@ -416,6 +417,9 @@ getNdIndex node = do
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
 
+
+--processes the given graph by traversing from the starting node.
+--all unprocessed nodes are fetched and processed
 dynamicProcess :: GraphMap Node -> Daison ()
 dynamicProcess graphmap = do
   let firstnode = fst $ Map.elemAt 0 graphmap
@@ -424,7 +428,7 @@ dynamicProcess graphmap = do
   unprocessedGraph <-processNodes graphmap graphmap firstnode (S "root")
   foldM_ (\acc x -> processNodes acc acc x (S "root") ) unprocessedGraph (Map.keys unprocessedGraph)
   return () 
-
+  
 processNodes :: GraphMap Node -> GraphMap Node -> Node -> Node -> Daison(GraphMap Node)
 processNodes graph graphMap node parent_node = do
   nd <- getNdIndex node
@@ -444,6 +448,8 @@ processNodes graph graphMap node parent_node = do
                 Just rest    ->do
                   foldM (\acc x -> processNodes graph acc x node) gm rest
 
+
+--handles insertion of new edges
 handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
@@ -551,7 +557,6 @@ handleInsert nd1 nd2 = do
   case par of
     (X pnd edges) ->  store nodeMapTable (Just nd1) (X pnd (nd2:edges))
   return()
---  store nodeMapTable (Just parent) (X pnd (List.nub (nd:edges)))
   where
     addHop nd1 (Labels tp pr ps hp dir fc lc ns ls) nd2 = when (nd1 > 0) $ do
       store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir fc lc ns ls)
@@ -609,6 +614,8 @@ getIntervalLabel ppr (Labels trp pr ps hp dir fc lc ns ls ) =
     (PreLabel nd) -> return pr
     (PostLabel nd) -> return ps
 
+--verifies and inserts a new child.
+--if there is no sufficient gap for a new child, relabelling is initiated and the new child node will be inserted.
 verifyAndInsertChild nd1 record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _) nd2 record2@(Labels tp2 _ _ _ _ _ _ _ _ ) = do 
       if(lc1 < 0) then do 
         if (ps1-pr1 <=2) then do 
@@ -645,7 +652,7 @@ verifyAndInsertChild nd1 record1@(Labels tp1 pr1 ps1 _ _ fc1 lc1 _ _) nd2 record
                 update_ graph1Table (return (lc1, lc1Record{nextSibling = nd2}))
                 return (record1{ lastChild = nd2}, record2{tree_parent=nd1, preL = pre, postL = post,lastSibling = lc1 }  )
 
-
+--handles deletion of existing edges.
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
@@ -732,6 +739,10 @@ handleDelete nd1 nd2 = do
         updateLabel fc2 fc2Record
       return()
 
+
+--Used in 2 conditions. (Mainly used to update all the labels of an independent graph)
+-- 1. When an independent graph is made a sub graph of another graph
+-- 2. When a tree ege is deleted, all the labels of new independent graph needs to be updated.
 updateLabel :: Nd ->Labels->  Daison ()
 updateLabel nd res = do
   liftIO $ print $ " update label nd :" ++ show nd
@@ -756,6 +767,7 @@ nextNode nd = do
       else nextPre trp
 
  -}
+
 nextNode :: Nd -> Labels-> Daison (Nd,Labels)
 nextNode nd record = do 
   (a, arecord) <- nextOf (PreLabel nd) record
@@ -770,6 +782,8 @@ nextPre (PostLabel n) record = if n <=0 then return (0, record)
     (b,bRecord) <- nextOf (PostLabel n) record
     nextPre b bRecord
 
+
+--initiates the relabelling process by finding the range of elements to be relabelled.
 reLabelMain :: PrePostRef -> Labels -> Daison ()
 reLabelMain v record  =  do 
   let d = 3
@@ -778,6 +792,7 @@ reLabelMain v record  =  do
   reLabelRange begin beginRecord newv newvRecord end newd newcount  
   return ()
 
+--initiates relabelling of the nodes depending on the input.
 reLabelRange :: PrePostRef -> Labels-> PrePostRef ->Labels-> PrePostRef -> Int64 ->Int64 -> Daison()
 reLabelRange begin beginRecord v vRecord end d count = do 
   let n = div d count
@@ -815,6 +830,7 @@ mainLoop d count begin beginRecord v vRecord end endRecord = do
   else 
     return (d, count, begin, beginRecord, v, vRecord, end, endRecord)
 
+--finds the left most element in the range by recursively calling itself.
 goPrev :: PrePostRef -> Labels-> PrePostRef -> Labels->Int64 ->  Int64 -> Daison (PrePostRef, Labels, PrePostRef, Labels,Int64,  Int64)
 goPrev begin beginRecord v vRecord count  d = do 
   vlabel <- getIntervalLabel v vRecord
@@ -838,6 +854,7 @@ prevOf ppr record@(Labels trp pr ps hp dir fc lc ns ls ) = do
       return ((PostLabel lc), lcLabels)  
       else return ((PreLabel nd), record)
 
+--finds the right most element to be relabelled by recursively calling itself.
 goNext :: PrePostRef -> Labels->PrePostRef-> Labels -> Int64 ->  Int64 -> Daison (PrePostRef, Labels, PrePostRef, Labels,Int64,  Int64)
 goNext end endRecord v vRecord count d = do 
   vlabel <- getIntervalLabel v vRecord
@@ -861,8 +878,9 @@ nextOf ppr record@(Labels trp pr ps hp dir fc lc ns ls ) = do
         trpLabels <- fetchLabels (PostLabel trp)
         return ((PostLabel trp) , trpLabels)
 
-makeDynamicOperation :: String -> AccessMode -> IO()
-makeDynamicOperation test_db readwritemode = do
+--performs search, insertion, deletion on the graph by taking the input and calling respective functions.
+performOperation :: String -> AccessMode -> IO()
+performOperation test_db readwritemode = do
     IO.hSetBuffering IO.stdin IO.NoBuffering
     putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion or (r) for Reset : ")
     choice <- getChar
@@ -903,7 +921,7 @@ makeDynamicOperation test_db readwritemode = do
     mapM_ (\y -> putStrLn (show y) ) a
 --    mapM_ (\y -> putStrLn (show y) ) b
     closeDB db
-    makeDynamicOperation test_db readwritemode
+    performOperation test_db readwritemode
 
 queryM :: Nd -> Labels-> Nd -> Labels -> Daison Bool
 queryM nd1 label1 nd2 label2 = do
