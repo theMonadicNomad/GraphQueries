@@ -238,16 +238,20 @@ generateGraph n p =  Graph $ map (\x -> (I x,restList x )) {- list@( -}[1..n]
     where 
         restList x= map I $ List.sort $ List.nub (take  (floor (p * fromIntegral (n-x))) $ randomRs (x+1,n) (mkStdGen 3) :: [Int64]  )
 
-generateTreeGraph :: Int64 -> Int64 -> IO (Graph Node)
-generateTreeGraph  total n  = do
+
+{- generates tree graphs by taking the input of total number of nodes(n), maximum number of total tree edges(n)
+  and maximum number of non-tree edges -}
+generateTreeGraph :: Int64 -> Int64 -> Int64-> IO (Graph Node)
+generateTreeGraph  total n p  = do
   if total == 0
     then return $ Graph []
     else do
       let rt = 1 
       (lrt , ch) <- genChild (total,  rt + 1 , n) rt
       let rest = (\x -> (I x, [])) <$> ([lrt+1 .. total])
-      final <- mapM (addMoreEdges total n) (ch ++ rest)
+      final <- mapM (addMoreEdges total p) (ch ++ rest)
       return $ Graph final
+
 
 addMoreEdges :: Int64 -> Int64 -> (Node, [Node]) -> IO (Node, [Node])
 addMoreEdges total n (I x, []) = if x == total 
@@ -312,14 +316,14 @@ main = do
   mapM_ (\y -> putStrLn (show y) ) a
   mapM_ (\y -> putStrLn (show y) ) b
   closeDB db
-  makeDynamicOperation databaseTest ReadWriteMode
+  performOperation databaseTest ReadWriteMode
 
 
-main1 :: Int64 -> Int64 -> IO ()
-main1 n d = do
+main1 :: Int64 -> Int64 ->Int64 -> IO ()
+main1 n d p = do
   removeFile databaseTest
   IO.hSetBuffering IO.stdin IO.NoBuffering
-  Graph g1 <- generateTreeGraph n d
+  Graph g1 <- generateTreeGraph n d p
   --print $ show g1 
   when (n<50) $ print $ show g1
   db <- openDB databaseTest
@@ -345,7 +349,7 @@ main1 n d = do
     mapM_ (\y -> putStrLn (show y) ) b
   print $ "Time for  DaiLabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
   closeDB db
-  makeDynamicOperation databaseTest ReadWriteMode
+  performOperation databaseTest ReadWriteMode
 
 getNdIndex node = do
   nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
@@ -355,6 +359,10 @@ getNdIndex node = do
       pkey <- insert_ nodeMapTable (X node [])
       return pkey
     _    -> error $ "ivalid getindex nd :" ++ show nod
+
+
+--processes the given graph by traversing from the starting node.
+--all unprocessed nodes are fetched and processed
 
 dynamicProcess :: GraphMap Node -> Daison ()
 dynamicProcess graphmap = do
@@ -389,7 +397,7 @@ processNodes graph graphMap node parent_node = do
   where
     insertIsolatedNode = getCounter >>= \x ->incrementCounter >>incrementCounter >> return (x*gap ,(x+1) *gap)
 
-
+--handles insertion of new edges
 handleInsert :: Nd -> Nd -> Daison ()
 handleInsert nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
@@ -448,7 +456,7 @@ handleInsert nd1 nd2 = do
               return ()
     ([]                                       ,[]                                          ) ->  -- Case 4
           do 
-             (pre1,pre2,post1,post2) <- insert2IsolatedNodes {- TODO: insert four labels after (PreLabel root) -}
+             (pre1,pre2,post1,post2) <- insert2IsolatedNodes 
              store graph1Table (Just nd1) (Labels 0   pre1 post1 Set.empty Set.empty )
              store graph1Table (Just nd2) (Labels nd1 pre2 post2 Set.empty Set.empty )
              return ()
@@ -463,6 +471,7 @@ handleInsert nd1 nd2 = do
       store graph1Table (Just nd1) (Labels tp pr ps (Set.insert nd2 hp) dir )
       return ()
 
+--handles deletion of existing edges.
 handleDelete :: Nd -> Nd -> Daison ()
 handleDelete nd1 nd2 = do
   res1 <- select (from graph1Table (at nd1))
@@ -562,6 +571,7 @@ reLabelAll  all visited t = do
     return ()
   return()
 
+--relabels an independant graph/ sub graph.
 relabel :: Nd -> [Nd] -> Char-> Daison [Nd]
 relabel nd visited t =  do 
   x <- updatePre nd visited
@@ -607,6 +617,7 @@ updatePost nd = do
         update_ graph1Table (return (nd, Labels trp pr (c_counter*gap) hp dir ))
       _   -> error "error from updatepost"
  
+--relabelling all nodes 
 reLabelprocess ::  Daison ()
 reLabelprocess  = do
   a <- select [ (ind, edges) | (ind, ( X nd edges )) <- from nodeMapTable everything ]
@@ -631,8 +642,9 @@ reLabelprocessNodes graph index (nd,edges) visited  = do
           store graph1Table (Just nd) record{preL = index, postL = index1}
           return (index1+1, visited' )  
 
-makeDynamicOperation :: String -> AccessMode -> IO()
-makeDynamicOperation test_db readwritemode = do
+--performs search, insertion, deletion on the graph by taking the input and calling respective functions.
+performOperation :: String -> AccessMode -> IO()
+performOperation test_db readwritemode = do
     IO.hSetBuffering IO.stdin IO.NoBuffering
     putStrLn ("Enter your choice for (s) for Search (i) for Edge Insertion or (d) for Edge Deletion : ")
     choice <- getChar
@@ -667,7 +679,7 @@ makeDynamicOperation test_db readwritemode = do
     mapM_ (\y -> putStrLn (show y) ) a
 --    mapM_ (\y -> putStrLn (show y) ) b
     closeDB db
-    makeDynamicOperation test_db readwritemode
+    performOperation test_db readwritemode
 
 
 queryM :: Nd -> Nd -> Daison Bool
