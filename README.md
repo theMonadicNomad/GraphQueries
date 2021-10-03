@@ -4,7 +4,7 @@ Implementing GraphQueries in Haskell using Reachability Queries. The Graph Queri
 
 1. Implementing Reachability Queries for Acyclic Statig graphs using AILabel (Augmented Interval Labelling) Approach  (https://doi.org/10.1007/978-3-319-25255-1_46)
 2. Implementing Reachability Queries for Acyclic Dynamic graphs using D-AILabel (Dynamic Augmented Interval Labelling) approach.
-3. Implementing Reachability Queries for Acyclic Dynamic graphs using D-AILabel with smart relabelling technique
+3. Implementing Reachability Queries for Acyclic Dynamic graphs using D-AILabel with smart relabelling technique (https://dl.acm.org/doi/10.5555/647912.740822)
 
 ## Project structure
 - [`app/`](DAILabel/app) - Haskell source code.
