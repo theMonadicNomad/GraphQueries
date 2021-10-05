@@ -240,7 +240,12 @@ main1 n d p = do
                 | otherwise = Map.fromList g1
   when (n<50) $ print $ show graphmap1
   removeFile databaseTest
- 
+  let b = if p == 0 
+            then (length g1-1)
+            else foldl (\x y -> x + length ( snd y)) 0 g1
+  liftIO $ print  $ " Total Edges : " ++ show b ++ " Tree edges : " ++ show (length g1 - 1) ++ " Non Tree Edges :" ++ show (b -(length g1 -1))
+  --let c = (b -(length g1 -1)) / b
+  liftIO $ print $ " NonTree Edges Percentage: " ++ show (  fromIntegral (b -(length g1 -1)) *100/ fromIntegral b)
   db <- openDB databaseTest
   (x,y,z) <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
@@ -249,6 +254,7 @@ main1 n d p = do
     staticProcess graphmap1
     end <- liftIO $ getCurrentTime
     let timePassed = diffUTCTime end start  
+    edgesPercent
     liftIO $ print $ " AILabel Index creation time:" ++  show timePassed 
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
@@ -343,13 +349,13 @@ processSearching nd1  nd2 = do
     when (flag11) $ do 
 --      liftIO $ print  $ " Result : " ++ show flag11 ++ " Time Taken for  AILabel1 Optimized Search1 : "++show timePassed11
 
-{-  
-     start1 <- liftIO $ getCurrentTime
+
+{-       start1 <- liftIO $ getCurrentTime
       flag1 <- search nd1 nd2 1
       end1 <- liftIO $ getCurrentTime
-      let timePassed1 = diffUTCTime end1 start1  
-      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show timePassed1
-
+      let timePassed1 = diffUTCTime end1 start1   -}
+--      liftIO $ print  $ " Result : " ++ show flag1 ++ " Time Taken for  AILabel Search : "++show (timePassed1 * 1000)
+{-  
       start <- liftIO $ getCurrentTime
       (flag, count) <- df_search nd1 nd2 0
       end <- liftIO $ getCurrentTime
@@ -361,8 +367,9 @@ processSearching nd1  nd2 = do
       end2 <- liftIO $ getCurrentTime
       let timePassed2 = diffUTCTime end2 start2  
 --      liftIO $ print  $ " Result : " ++ show flag2  ++ " Nodes: " ++ show count2 ++" Time Taken for Depth First Search : "++show timePassed2
-      liftIO $ print  $ " Nodes: " ++ show count2 ++ " AI: " ++ show (timePassed11*1000)++ " DS: "++show (timePassed2 *1000) 
       
+      liftIO $ print  $ " Nodes: " ++ show count2 ++ " OAI: " ++ show (timePassed11 * 1000)++{-  " AI: "++ show (timePassed1 * 1000) ++ -} " DS: "++show (timePassed2 * 1000) 
+      when (flag11 /= flag2 {- || flag11 /= flag1 -}) $ liftIO $ print $ "failed for " ++ show (nd1,nd2)
 {-       if(flag11 && flag1 && flag && flag2 ) then return ()
         else do  -}
 {-     when (flag1/=flag2) $ do
@@ -424,6 +431,23 @@ performManualSearch test_db readwritemode = do
     closeDB db
     performManualSearch test_db readwritemode
 
+edgesPercent :: Daison()
+edgesPercent = do 
+  a <- select [ (ind, length edges) | (ind, ( X nd edges )) <- from nodeMapTable everything ]
+  let b = foldl (\x y -> x + snd y) 0 a
+  liftIO $ print  $ " Total Edges : " ++ show b ++ " Tree edges : " ++ show (length a - 1) ++ " Non Tree Edges :" ++ show (b -(length a -1))
+{-   b <- foldM (\acc x -> do
+
+
+              )
+            0
+            a -}
+  return ()
+{-   foldM_ (\(index, visited) x -> do 
+    (index', visited') <- countEdge (Map.fromList a) index x visited
+    return (index', visited')) (0, []) a 
+ -}
+
 
 step1 :: Nd -> Nd ->Labels-> Daison Bool
 step1 nd1 nd2 label2 = do
@@ -449,15 +473,23 @@ search nd1 nd2 step = do
         flag <- step1 nd1 nd2 label2
         if flag then return True
           else do
-            x <- or <$> (mapM (\x -> search x nd2 1) (Set.toList hp1)) 
+            x <-  (foldM (\acc x -> if acc
+              then return acc
+              else search x nd2 1) False (Set.toList hp1)) 
             if x then return True
             else do
-              or <$> (mapM (\x -> search  x nd2 2) ( filter (/=nd1) (Set.toList dir1)) )
+              (foldM (\acc x -> if acc 
+                then return acc
+                else search  x nd2 2) False ( filter (/=nd1) (Set.toList dir1)) )
         else do
-          x <- or <$> (mapM (\x -> search x nd2 1) (Set.toList hp1)) 
+          x <- (foldM (\acc x -> if acc
+            then return acc
+            else search x nd2 1) False (Set.toList hp1)) 
           if x then return True
             else do
-              or <$> (mapM (\x -> search  x nd2 2) ( filter (/=nd1)(Set.toList dir1)) )
+              (foldM (\acc x -> if acc
+                then return acc
+                else search  x nd2 2) False ( filter (/=nd1)(Set.toList dir1)) )
 
 --optimized AILabel search function.
 search1 :: Nd -> Nd ->Int -> (Set (Nd,Nd)) -> Daison (Bool, Set (Nd, Nd))
@@ -473,7 +505,7 @@ search1 nd1 nd2 step queryset = do
         if flag then return (True, newset)
           else do
             (x,s'') <- foldM (\(b,s ) x -> do 
-                            if (Set.member (x,nd2) s ) then return (b,s)
+                            if b || (Set.member (x,nd2) s) then return (b,s)
                               else do 
                                 (b',s') <- search1 x nd2 1 s                                   
                                 return (b'||b ,s'))
@@ -482,7 +514,7 @@ search1 nd1 nd2 step queryset = do
             if x then return (True,s'')
             else do
                 foldM (\(b,s) x -> do
-                          if (Set.member (x,nd2) s ) then return (b,s)
+                          if b || (Set.member (x,nd2) s ) then return (b,s)
                             else do 
                               (b',s') <- search1 x nd2 2 s                                  
                               return (b'||b, s' ))
@@ -490,7 +522,7 @@ search1 nd1 nd2 step queryset = do
                       ( filter (/=nd1)(Set.toList dir1)) 
         else do
           (x,s'') <- foldM (\(b,s) x -> do 
-                                     if (Set.member (x, nd2) s) then return (b,s)
+                                     if b || (Set.member (x, nd2) s) then return (b,s)
                                         else do 
                                           (b',s') <- search1 x nd2 1 s                                 
                                           return (b'||b,s' ))
@@ -499,7 +531,7 @@ search1 nd1 nd2 step queryset = do
           if x then return (True,s'')
             else do
               foldM (\(b,s) x -> do 
-                                    if (Set.member (x, nd2) s ) then return (b,s)
+                                    if b || (Set.member (x, nd2) s ) then return (b,s)
                                       else do 
                                         (b',s') <- search1 x nd2 2 s                               
                                         return (b'||b,s' ))
@@ -544,13 +576,22 @@ df_search1 (nd1:rs) nd2 count  = do
       True -> return (True, count)
       False -> do
         (b, count') <- df_search1 [first] nd2 (count +1)
-        if(b) then return (True, count') 
+        if b
+          then return (True, count') 
           else do
-            (c, count'') <- if (rest == []) then return (b, count') else df_search1 rest nd2 (count'+1)
-            if (c) then return (True, count'') 
+            (c, count'') <- 
+              if null rest 
+                then return (b, count') 
+                else df_search1 rest nd2 (count'+1)
+            if c
+              then return (True, count'') 
               else do 
-                if (rs == []) then return (c, count'') else df_search1 rs nd2 (count''+1)
-    [] -> if (rs == []) then return (False, count) else df_search1 rs nd2 (count+1)
+                if null rs 
+                  then return (c, count'') 
+                  else df_search1 rs nd2 (count''+1)
+    [] -> if null rs
+           then return (False, count) 
+           else df_search1 rs nd2 (count+1)
        --return (False, count)
 
 
