@@ -135,15 +135,15 @@ ranValues12  gen n  = do
   return (values, newGen)
 
 
-generateTreeGraph :: Int64 -> Int64 -> IO (Graph Node)
-generateTreeGraph  total n  = do
+generateTreeGraph :: Int64 -> Int64 ->Int64-> IO (Graph Node)
+generateTreeGraph  total n p = do
   if total == 0
     then return $ Graph []
     else do
       let rt = 1 
       (lrt , ch) <- genChild (total,  rt + 1 , n) rt
       let rest = (\x -> (I x, [])) <$> ([lrt+1 .. total])
-      final <- mapM (addMoreEdges total n) (ch ++ rest)
+      final <- mapM (addMoreEdges total p) (ch ++ rest)
       return $ Graph final
 
 addMoreEdges :: Int64 -> Int64 -> (Node, [Node]) -> IO (Node, [Node])

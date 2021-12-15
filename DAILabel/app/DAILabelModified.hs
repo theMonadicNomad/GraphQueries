@@ -386,6 +386,13 @@ main1 n d p = do
   Graph g1 <- generateTreeGraph n d p
 --  let Graph g1 = generateGraph n d
   when (n<50) $ print $ show g1
+  let b = if p == 0 
+            then (length g1-1)
+            else foldl (\x y -> x + length ( snd y)) 0 g1
+  liftIO $ print  $ " Total Edges : " ++ show b ++ " Tree edges : " ++ show (length g1 - 1) ++ " Non Tree Edges :" ++ show (b -(length g1 -1))
+  --let c = (b -(length g1 -1)) / b
+  liftIO $ print $ " NonTree Edges Percentage: " ++ show (  fromIntegral (b -(length g1 -1)) *100/ fromIntegral b)
+
   db <- openDB databaseTest
   (a,b,c)  <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
