@@ -231,8 +231,8 @@ generateChildren n c total =   do
 
 
 
-main1 :: Int64 -> Int64 ->Int64-> IO ()
-main1 n d p = do
+main1 :: Int64 -> Int64 ->Int64-> Int64-> IO ()
+main1 n d p benchmarking_flag = do
   IO.hSetBuffering IO.stdin IO.NoBuffering
   Graph g1 <- generateTreeGraph n d p
   let Graph g = graph2
@@ -258,20 +258,22 @@ main1 n d p = do
     liftIO $ print $ " AILabel Index creation time:" ++  show timePassed 
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
-    performRandomSearch n
+    when (benchmarking_flag == 0) $ do performRandomSearch n
     return (x,y,  timePassed)
 
   putStrLn "-------------------"
-  print $ " Do you want to display all the contents of graph and nodemap table (y/n): "
-  process_char <- getChar
-  when (process_char == 'y') $ do
-    mapM_ print x
-    mapM_ print y
   print $ "Time for AILabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show z
 
-  closeDB db
-  performManualSearch databaseTest ReadWriteMode
-
+  if (benchmarking_flag == 0) then 
+    do
+      print $ " Do you want to display all the contents of graph and nodemap table (y/n): "
+      process_char <- getChar
+      when (process_char == 'y') $ do
+        mapM_ print x
+        mapM_ print y
+      closeDB db
+      performManualSearch databaseTest ReadWriteMode
+    else closeDB db
 
 staticProcess :: GraphMap Node-> Daison ()
 staticProcess graph = do

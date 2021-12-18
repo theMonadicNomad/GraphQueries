@@ -57,16 +57,25 @@ main = do
   inp_2 <- getLine
   putStrLn (" Enter the maximum number of non-tree edges a node can have : ")
   inp_3 <- getLine
-  putStrLn ("a for AILabel")
-  putStrLn ("d for DAILabel")
-  putStrLn ("m for DAILabelModified")
-  putStrLn ("Enter your choice : ")
-  process_char <- getChar
+  putStrLn (" Enter you choice (b) for benchmarking all the algorithms, (p) for processing individually : ")
+  inp_4 <- getChar
   let n = (read inp_1 :: Int64)
   let d = (read inp_2 :: Int64)
   let p = (read inp_3 :: Int64)
-  case process_char of
-    'a' -> AILabel.main1 n d p
-    'd' -> DAILabel.main1 n d p
-    'm' -> DAILabelModified.main1 n d p
-    _   -> putStrLn("Try again ") >> main
+  if(inp_4 == 'p') then
+    do
+      putStrLn ("a for AILabel")
+      putStrLn ("d for DAILabel")
+      putStrLn ("m for DAILabelModified")
+      putStrLn ("Enter your choice : ")
+      process_char <- getChar
+      case process_char of
+        'a' -> AILabel.main1 n d p 0 
+        'd' -> DAILabel.main1 n d p 0 
+        'm' -> DAILabelModified.main1 n d p 0
+        _   -> putStrLn("Try again ") >> main
+    else do
+      defaultMain [ bench "ai_la" $ nfIO (AILabel.main1 n d p 1)] 
+      defaultMain [ bench "Dai_la" $ nfIO (DAILabel.main1 n d p 1 )] 
+      defaultMain [ bench "Smart_Dai_la" $ nfIO (DAILabelModified.main1 n d p 1)]  
+          

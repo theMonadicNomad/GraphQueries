@@ -379,8 +379,8 @@ main = do
   closeDB db
   performOperation databaseTest ReadWriteMode
 
-main1  :: Int64 -> Int64 ->Int64-> IO ()
-main1 n d p = do
+main1  :: Int64 -> Int64 ->Int64->Int64 ->IO ()
+main1 n d p benchmarking_flag = do
   removeFile databaseTest
   IO.hSetBuffering IO.stdin IO.NoBuffering
   Graph g1 <- generateTreeGraph n d p
@@ -413,7 +413,7 @@ main1 n d p = do
     mapM_ (\y -> putStrLn (show y) ) b
   print $ "Time for  DaiLabel modified for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
   closeDB db
-  performOperation databaseTest ReadWriteMode
+  when (benchmarking_flag == 0) $ do performOperation databaseTest ReadWriteMode
 
 getNdIndex node = do
   nod <- select [ind | (ind, ( X nd nodeindex )) <- from nodeMapTable everything , nd == node  ]
