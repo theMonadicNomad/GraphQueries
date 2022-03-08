@@ -243,9 +243,13 @@ main1 n d p benchmarking_flag = do
   let b = if p == 0 
             then (length g1-1)
             else foldl (\x y -> x + length ( snd y)) 0 g1
-  liftIO $ print  $ " Total Edges : " ++ show b ++ " Tree edges : " ++ show (length g1 - 1) ++ " Non Tree Edges :" ++ show (b -(length g1 -1))
+ -- liftIO $ print  $ " Total Edges : " ++ show b ++ " Tree edges : " ++ show (length g1 - 1) ++ " Non Tree Edges :" ++ show (b -(length g1 -1))
+  liftIO $ print  $ "Edges: " ++ show b ++ " Tree: " ++ show (length g1 - 1) ++ " NonTree:" ++ show (b -(length g1 -1)) ++ " NTE%: " ++ show (  fromIntegral (b -(length g1 -1)) *100/ fromIntegral b)
+
   --let c = (b -(length g1 -1)) / b
-  liftIO $ print $ " NonTree Edges Percentage: " ++ show (  fromIntegral (b -(length g1 -1)) *100/ fromIntegral b)
+--  liftIO $ print $ " NonTree Edges Percentage: " ++ show (  fromIntegral (b -(length g1 -1)) *100/ fromIntegral b)
+
+
   db <- openDB databaseTest
   (x,y,z) <- runDaison db ReadWriteMode $ do
     tryCreateTable graph1Table
@@ -255,14 +259,14 @@ main1 n d p benchmarking_flag = do
     end <- liftIO $ getCurrentTime
     let timePassed = diffUTCTime end start  
     edgesPercent
-    liftIO $ print $ " AILabel Index creation time:" ++  show timePassed 
+--    liftIO $ print $ " AILabel Index creation time:" ++  show timePassed 
     x<-select (from graph1Table everything)
     y<-select (from nodeMapTable everything)
     when (benchmarking_flag == 0) $ do performRandomSearch n
     return (x,y,  timePassed)
 
-  putStrLn "-------------------"
-  print $ "Time for AILabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show z
+--  putStrLn "-------------------"
+  print $ "TimeAILabel n : " ++ show n ++ " d: " ++ show d ++ " p: " ++ show p ++" : " ++ show z
 
   if (benchmarking_flag == 0) then 
     do

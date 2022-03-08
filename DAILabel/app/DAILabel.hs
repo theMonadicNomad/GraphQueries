@@ -326,12 +326,13 @@ main1 n d p benchmarking_flag = do
   Graph g1 <- generateTreeGraph n d p
   --print $ show g1 
   when (n<50) $ print $ show g1
-  let b = if p == 0 
+  let bc = if p == 0 
             then (length g1-1)
             else foldl (\x y -> x + length ( snd y)) 0 g1
-  liftIO $ print  $ " Total Edges : " ++ show b ++ " Tree edges : " ++ show (length g1 - 1) ++ " Non Tree Edges :" ++ show (b -(length g1 -1))
+  liftIO $ print  $ "Edges: " ++ show bc ++ " Tree: " ++ show (length g1 - 1) ++ " NonTree:" ++ show (bc -(length g1 -1)) ++ " NTE%: " ++ show (  fromIntegral (bc -(length g1 -1)) *100/ fromIntegral bc)
+
   --let c = (b -(length g1 -1)) / b
-  liftIO $ print $ " NonTree Edges Percentage: " ++ show (  fromIntegral (b -(length g1 -1)) *100/ fromIntegral b)
+--  liftIO $ print $ " NTE%: " ++ show (  fromIntegral (b -(length g1 -1)) *100/ fromIntegral b)
 
   db <- openDB databaseTest
   (a,b,c)  <- runDaison db ReadWriteMode $ do
@@ -350,11 +351,11 @@ main1 n d p benchmarking_flag = do
     a <- select [ x | x <- from graph1Table everything ]
     b <- select [ x | x <- from nodeMapTable everything ]
     return (a,b,timePassed)
-  putStrLn "FROM dailabel"
+--  putStrLn "FROM dailabel"
   when (n<50) $ do
     mapM_ (\y -> putStrLn (show y) ) a
     mapM_ (\y -> putStrLn (show y) ) b
-  print $ "Time for  DaiLabel  for n : " ++ show n ++ " d " ++ show d ++ " : "++ show c
+  print $ "Time for DaiLabel  for n : " ++ show n ++ " d: " ++ show d ++ " p: " ++ show p ++" : " ++ show c
   closeDB db
   when(benchmarking_flag == 0) $ do performOperation databaseTest ReadWriteMode
 
